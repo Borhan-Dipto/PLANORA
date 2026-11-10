@@ -4,9 +4,9 @@ import { profiles } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { signOut } from "@/lib/actions/auth";
 import { redirect } from "next/navigation";
+import { getDictionary, getLocale } from "@/lib/i18n";
+import { AppShell } from "@/components/app-shell";
 
-// TODO(Phase 2): adopt Suspense + `use cache: private` streaming pattern
-// instead of blocking the whole route on the session read.
 export const instant = false;
 
 export default async function DashboardPage() {
@@ -15,17 +15,30 @@ export default async function DashboardPage() {
   if (!user) redirect("/login");
 
   const [profile] = await db.select().from(profiles).where(eq(profiles.id, user.id));
+  const dict = await getDictionary();
+  const locale = await getLocale();
 
   return (
-    <main className="p-6">
-      <h1 className="text-xl font-semibold">আজ কী পড়ব?</h1>
-      <p className="mt-2 text-gray-600">
-        স্বাগতম, {profile?.displayName ?? user.email}
-      </p>
-      <p className="mt-1 text-sm text-gray-400">এখনো কোনো প্ল্যান নেই। Planner ফেজ-৩-এ আসবে।</p>
-      <form action={signOut} className="mt-6">
-        <button className="rounded border px-3 py-1.5 text-sm">লগ আউট</button>
-      </form>
-    </main>
+    <AppShell dict={dict} locale={locale}>
+      <header className="flex items-center justify-between border-b border-border p-4">
+        <span className="font-semibold text-accent">PLANORA</span>
+        <form action={signOut}>
+          <button className="rounded-md border border-border px-3 py-1.5 text-sm text-muted hover:text-foreground">
+            {dict.auth.logout}
+          </button>
+        </form>
+      </header>
+
+      <main className="p-6">
+        <h1 className="text-xl font-semibold">{dict.dashboard.question}</h1>
+        <p className="mt-2 text-muted">
+          {dict.dashboard.greeting}, {profile?.displayName ?? user.email}
+        </p>
+        <div className="mt-6 rounded-lg border border-border bg-surface p-6 text-center text-muted">
+          <p>{dict.dashboard.noPlan}</p>
+          <p className="mt-1 text-sm">{dict.dashboard.noPlanHint}</p>
+        </div>
+      </main>
+    </AppShell>
   );
 }

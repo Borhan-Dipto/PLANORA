@@ -9,9 +9,9 @@ function VerifyForm() {
   const email = useSearchParams().get("email") ?? "";
 
   return (
-    <form action={action} className="w-full max-w-sm space-y-4">
-      <h1 className="text-2xl font-semibold">কোড যাচাই করুন</h1>
-      <p className="text-sm text-gray-500">{email} -এ পাঠানো ৬ সংখ্যার কোড দিন।</p>
+    <form action={action} className="w-full max-w-sm space-y-4 rounded-xl border border-border bg-surface p-6 shadow-sm">
+      <h1 className="text-xl font-semibold">কোড যাচাই করুন</h1>
+      <p className="text-sm text-muted">{email} -এ পাঠানো কোড দিন।</p>
       <input type="hidden" name="email" value={email} />
       <input
         name="token"
@@ -19,13 +19,13 @@ function VerifyForm() {
         maxLength={8}
         required
         placeholder="কোড পেস্ট করুন"
-        className="w-full rounded border px-3 py-2 text-center text-lg tracking-widest"
+        className="w-full rounded-md border border-border bg-background px-3 py-2 text-center text-lg tracking-widest outline-none focus:ring-2 focus:ring-accent"
       />
-      {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
+      {state?.error && <p className="text-sm text-error">{state.error}</p>}
       <button
         type="submit"
         disabled={pending}
-        className="w-full rounded bg-blue-600 px-3 py-2 text-white disabled:opacity-50"
+        className="w-full rounded-md bg-accent px-3 py-2 font-medium text-accent-foreground disabled:opacity-50"
       >
         {pending ? "যাচাই হচ্ছে..." : "যাচাই করুন"}
       </button>
@@ -35,8 +35,8 @@ function VerifyForm() {
 
 export default function VerifyPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center p-6">
-      <Suspense fallback={<p>Loading...</p>}>
+    <main className="flex min-h-screen items-center justify-center bg-background p-6">
+      <Suspense fallback={<p className="text-muted">Loading...</p>}>
         <VerifyForm />
       </Suspense>
     </main>

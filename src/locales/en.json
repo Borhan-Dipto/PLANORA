@@ -1,0 +1,30 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "planner": "Planner",
+    "subjects": "Subjects",
+    "revision": "Revision",
+    "progress": "Progress",
+    "notes": "Notes",
+    "settings": "Settings"
+  },
+  "dashboard": {
+    "greeting": "Welcome",
+    "question": "What should I study today?",
+    "noPlan": "No plan yet.",
+    "noPlanHint": "The Planner arrives in Phase 3."
+  },
+  "auth": {
+    "emailPrompt": "Enter your email, we'll send you a code.",
+    "sendCode": "Send code",
+    "sending": "Sending...",
+    "verify": "Verify",
+    "verifying": "Verifying...",
+    "logout": "Log out"
+  },
+  "settings": {
+    "title": "Settings",
+    "theme": "Theme",
+    "language": "Language"
+  }
+}

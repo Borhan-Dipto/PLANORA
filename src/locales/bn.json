@@ -1,0 +1,30 @@
+{
+  "nav": {
+    "dashboard": "ড্যাশবোর্ড",
+    "planner": "প্ল্যানার",
+    "subjects": "বিষয়",
+    "revision": "রিভিশন",
+    "progress": "অগ্রগতি",
+    "notes": "নোট",
+    "settings": "সেটিংস"
+  },
+  "dashboard": {
+    "greeting": "স্বাগতম",
+    "question": "আজ কী পড়ব?",
+    "noPlan": "এখনো কোনো প্ল্যান নেই।",
+    "noPlanHint": "প্ল্যানার ফেজ-৩-এ আসবে।"
+  },
+  "auth": {
+    "emailPrompt": "আপনার ইমেইল দিন, আমরা একটা কোড পাঠাব।",
+    "sendCode": "কোড পাঠান",
+    "sending": "পাঠানো হচ্ছে...",
+    "verify": "যাচাই করুন",
+    "verifying": "যাচাই হচ্ছে...",
+    "logout": "লগ আউট"
+  },
+  "settings": {
+    "title": "সেটিংস",
+    "theme": "থিম",
+    "language": "ভাষা"
+  }
+}
