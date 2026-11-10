@@ -53,8 +53,15 @@ export function LiveTimeBudget({
 
   if (!now) return null; // avoid a hydration mismatch — first real tick happens on the client
 
-  const wake = parseTimeToday(wakeTime, now);
-  const sleep = parseTimeToday(sleepTime, now);
+  let wake = parseTimeToday(wakeTime, now);
+  let sleep = parseTimeToday(sleepTime, now);
+  // Overnight schedule (e.g. wake 06:00, sleep 00:00/01:00): bedtime falls after midnight, i.e. tomorrow's clock time.
+  if (sleep.getTime() <= wake.getTime()) sleep = new Date(sleep.getTime() + 86_400_000);
+  // Whole window already passed (it's deep night, past bedtime) — the next awake window is tomorrow's.
+  if (sleep.getTime() <= now.getTime()) {
+    wake = new Date(wake.getTime() + 86_400_000);
+    sleep = new Date(sleep.getTime() + 86_400_000);
+  }
   const totalAwakeMin = Math.max(1, Math.round((sleep.getTime() - wake.getTime()) / 60000));
   const awakeRemainingSec = Math.max(0, Math.round((sleep.getTime() - now.getTime()) / 1000));
   const awakeRemainingMin = awakeRemainingSec / 60;
