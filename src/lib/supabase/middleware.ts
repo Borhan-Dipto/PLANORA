@@ -29,7 +29,7 @@ export async function updateSession(request: NextRequest) {
   const isAuthRoute = ["/login", "/register", "/verify", "/auth"].some((p) =>
     request.nextUrl.pathname.startsWith(p)
   );
-  const isPublicRoute = request.nextUrl.pathname === "/" || request.nextUrl.pathname.startsWith("/pricing");
+  const isPublicRoute = request.nextUrl.pathname === "/" || request.nextUrl.pathname.startsWith("/pricing") || request.nextUrl.pathname === "/api/ai-health";
   const isAdminRoute = request.nextUrl.pathname.startsWith("/admin");
 
   if (!user && !isAuthRoute && !isPublicRoute && !isAdminRoute) {
