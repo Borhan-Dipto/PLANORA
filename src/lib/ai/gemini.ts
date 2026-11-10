@@ -25,19 +25,37 @@ export async function generateJson({
   const models = (process.env.AI_PROVIDER_MODEL || DEFAULT_MODELS).split(",").map((m) => m.trim()).filter(Boolean);
   if (!models.includes("gemini-flash-lite-latest")) models.push("gemini-flash-lite-latest");
 
-  const call = (model: string, thinking: boolean) =>
+  // Request variants, tried in order on HTTP 400 — models differ in which structured-output options they accept.
+  type Variant = "schema" | "jsonSchema" | "plain";
+  const variants: { v: Variant; thinkingOff: boolean }[] = [
+    { v: "schema", thinkingOff: true },
+    { v: "schema", thinkingOff: false },
+    { v: "jsonSchema", thinkingOff: false },
+    { v: "plain", thinkingOff: false },
+  ];
+
+  const call = (model: string, { v, thinkingOff }: { v: Variant; thinkingOff: boolean }) =>
     fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": key },
       body: JSON.stringify({
-        systemInstruction: { parts: [{ text: system }] },
+        systemInstruction: {
+          parts: [
+            {
+              text:
+                v === "plain"
+                  ? `${system}\n\nRespond ONLY with a JSON object matching this schema:\n${JSON.stringify(toJsonSchema(responseSchema))}`
+                  : system,
+            },
+          ],
+        },
         contents,
         generationConfig: {
           temperature,
           responseMimeType: "application/json",
-          responseSchema,
-          // Structured planning output doesn't need long "thinking".
-          ...(thinking ? {} : { thinkingConfig: { thinkingBudget: 0 } }),
+          ...(v === "schema" ? { responseSchema } : {}),
+          ...(v === "jsonSchema" ? { responseJsonSchema: toJsonSchema(responseSchema) } : {}),
+          ...(thinkingOff ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
         },
       }),
       signal: AbortSignal.timeout(35_000),
@@ -46,21 +64,26 @@ export async function generateJson({
   const started = Date.now();
   let res: Response | null = null;
   let lastStatus = 0;
-  for (const model of models) {
-    if (Date.now() - started > 80_000) break;
-    try {
-      let r = await call(model, false);
-      if (r.status === 400 && /thinking/i.test(await r.clone().text())) r = await call(model, true);
-      if (r.ok) {
-        res = r;
-        break;
+  outer: for (const model of models) {
+    for (const variant of variants) {
+      if (Date.now() - started > 80_000) break outer;
+      try {
+        const r = await call(model, variant);
+        if (r.ok) {
+          console.info("Gemini variant", model, variant.v, variant.thinkingOff ? "no-thinking" : "");
+          res = r;
+          break outer;
+        }
+        lastStatus = r.status;
+        console.error("Gemini error", model, variant.v, r.status, (await r.text()).slice(0, 300));
+        if (r.status === 400) continue; // try next request variant on the same model
+        if ([404, 429, 500, 503].includes(r.status)) continue outer; // try next model
+        break outer; // auth errors etc.
+      } catch (e) {
+        console.error("Gemini fetch failed", model, Date.now() - started, "ms", e);
+        lastStatus = 504;
+        continue outer;
       }
-      lastStatus = r.status;
-      console.error("Gemini error", model, r.status, (await r.text()).slice(0, 300));
-      if (![404, 429, 500, 503].includes(r.status)) break; // auth/request errors won't be fixed by another model
-    } catch (e) {
-      console.error("Gemini fetch failed", model, Date.now() - started, "ms", e);
-      lastStatus = 504;
     }
   }
 
@@ -142,3 +165,12 @@ export const chatResponseSchema = {
   },
   required: ["reply", "ready", "missing", "draft"],
 };
+
+/** Gemini OpenAPI-subset schema (UPPERCASE types) → standard JSON Schema. */
+function toJsonSchema(node: unknown): unknown {
+  if (Array.isArray(node)) return node.map(toJsonSchema);
+  if (!node || typeof node !== "object") return node;
+  return Object.fromEntries(
+    Object.entries(node).map(([k, v]) => [k, k === "type" && typeof v === "string" ? v.toLowerCase() : toJsonSchema(v)])
+  );
+}
