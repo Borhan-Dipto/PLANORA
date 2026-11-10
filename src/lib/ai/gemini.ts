@@ -5,6 +5,8 @@ export type GeminiContent = { role: "user" | "model"; parts: Part[] };
 
 export class AiError extends Error {}
 
+const DEFAULT_MODELS = "gemini-3.8-flash,gemini-flash-latest";
+
 /** Calls Gemini with structured JSON output. Returns parsed JSON + token usage. */
 export async function generateJson({
   system,
@@ -18,10 +20,12 @@ export async function generateJson({
   temperature?: number;
 }): Promise<{ data: unknown; inputTokens: number; outputTokens: number }> {
   const key = process.env.AI_PROVIDER_API_KEY;
-  const model = process.env.AI_PROVIDER_MODEL || "gemini-flash-latest";
   if (!key) throw new AiError("AI কনফিগার করা নেই");
+  // Comma-separated fallback chain: if a model is overloaded (503), rate-limited (429) or retired (404), try the next.
+  const models = (process.env.AI_PROVIDER_MODEL || DEFAULT_MODELS).split(",").map((m) => m.trim()).filter(Boolean);
+  if (!models.includes("gemini-flash-lite-latest")) models.push("gemini-flash-lite-latest");
 
-  const call = (thinking: boolean) =>
+  const call = (model: string, thinking: boolean) =>
     fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": key },
@@ -32,36 +36,42 @@ export async function generateJson({
           temperature,
           responseMimeType: "application/json",
           responseSchema,
-          // Structured planning output doesn't need long "thinking" — it made calls time out.
+          // Structured planning output doesn't need long "thinking".
           ...(thinking ? {} : { thinkingConfig: { thinkingBudget: 0 } }),
         },
       }),
-      signal: AbortSignal.timeout(100_000),
+      signal: AbortSignal.timeout(35_000),
     });
 
   const started = Date.now();
-  let res: Response;
-  try {
-    res = await call(false);
-    if (res.status === 400) {
-      const body = await res.clone().text();
-      if (/thinking/i.test(body)) res = await call(true); // model doesn't accept a zero budget
+  let res: Response | null = null;
+  let lastStatus = 0;
+  for (const model of models) {
+    if (Date.now() - started > 80_000) break;
+    try {
+      let r = await call(model, false);
+      if (r.status === 400 && /thinking/i.test(await r.clone().text())) r = await call(model, true);
+      if (r.ok) {
+        res = r;
+        break;
+      }
+      lastStatus = r.status;
+      console.error("Gemini error", model, r.status, (await r.text()).slice(0, 300));
+      if (![404, 429, 500, 503].includes(r.status)) break; // auth/request errors won't be fixed by another model
+    } catch (e) {
+      console.error("Gemini fetch failed", model, Date.now() - started, "ms", e);
+      lastStatus = 504;
     }
-  } catch (e) {
-    console.error("Gemini fetch failed", model, Date.now() - started, "ms", e);
-    if (e instanceof Error && e.name === "TimeoutError") throw new AiError("AI উত্তর দিতে বেশি সময় নিচ্ছে, আবার চেষ্টা করুন");
-    throw new AiError("AI-এর সাথে যোগাযোগ করা যায়নি, আবার চেষ্টা করুন");
   }
 
-  if (!res.ok) {
-    const body = await res.text();
-    console.error("Gemini error", res.status, body.slice(0, 500));
-    if (res.status === 429) throw new AiError("AI এখন ব্যস্ত, এক মিনিট পরে আবার চেষ্টা করুন");
+  if (!res) {
+    if (lastStatus === 429) throw new AiError("AI এখন ব্যস্ত, এক মিনিট পরে আবার চেষ্টা করুন");
+    if (lastStatus === 503 || lastStatus === 504) throw new AiError("AI সার্ভারে এখন অনেক চাপ, একটু পরে আবার চেষ্টা করুন");
     throw new AiError("AI সার্ভিসে সমস্যা হয়েছে, আবার চেষ্টা করুন");
   }
 
   const json = await res.json();
-  console.info("Gemini ok", json?.modelVersion ?? model, Date.now() - started, "ms");
+  console.info("Gemini ok", json?.modelVersion, Date.now() - started, "ms");
   const text: string | undefined = json?.candidates?.[0]?.content?.parts
     ?.map((p: Part) => p.text ?? "")
     .join("");

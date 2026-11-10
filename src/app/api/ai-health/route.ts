@@ -22,12 +22,14 @@ export async function GET() {
       headers: { "Content-Type": "application/json", ...headers },
       body: JSON.stringify({ contents: [{ parts: [{ text: "Say OK" }] }] }),
     });
+  const list = await fetch(`${base}/models?pageSize=200`, { headers: { "x-goog-api-key": key } }).then((r) => r.json()).catch(() => ({}));
+  const names = (list.models ?? [])
+    .filter((m: { supportedGenerationMethods?: string[] }) => m.supportedGenerationMethods?.includes("generateContent"))
+    .map((m: { name: string }) => m.name.replace("models/", ""));
   const results = await Promise.all([
-    probe("list", `${base}/models?pageSize=50`, { headers: { "x-goog-api-key": key } }),
+    gen("gemini-3.8-flash", { "x-goog-api-key": key }),
+    gen("gemini-flash-lite-latest", { "x-goog-api-key": key }),
     gen(model, { "x-goog-api-key": key }),
-    gen("gemini-2.5-flash", { "x-goog-api-key": key }),
-    gen(model, { Authorization: `Bearer ${key}` }),
-    probe("google.com", "https://www.google.com/generate_204", {}),
   ]);
-  return Response.json({ model, keyPrefix: key.slice(0, 3), keyLen: key.length, results });
+  return Response.json({ model, names, results });
 }
