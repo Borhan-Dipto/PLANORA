@@ -9,8 +9,6 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
 import { SleepScheduleForm } from "@/components/sleep-schedule-form";
 
-export const instant = false;
-
 export default async function SettingsPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

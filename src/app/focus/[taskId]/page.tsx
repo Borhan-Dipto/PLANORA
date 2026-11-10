@@ -3,8 +3,6 @@ import { requireUserId } from "@/lib/session";
 import { startFocusSession } from "@/lib/actions/focus";
 import { FocusScreen } from "@/components/focus/focus-screen";
 
-export const instant = false;
-
 export default async function FocusPage({ params }: PageProps<"/focus/[taskId]">) {
   const { taskId } = await params;
   await requireUserId();

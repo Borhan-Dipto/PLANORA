@@ -12,8 +12,6 @@ import { TaskList, type TaskItem } from "@/components/schedule/task-list";
 import { RescheduleBanner } from "@/components/schedule/reschedule-button";
 import { ui, fmtMinutes, WEEKDAY_LABEL } from "@/components/ui";
 
-export const instant = false;
-
 export default async function SchedulePage({ params }: PageProps<"/planner/[id]/schedule">) {
   const { id } = await params;
   const userId = await requireUserId();

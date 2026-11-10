@@ -16,8 +16,6 @@ import { LiveTimeBudget } from "@/components/schedule/live-time-budget";
 import { LiveClock } from "@/components/live-clock";
 import { ui, fmtMinutes } from "@/components/ui";
 
-export const instant = false;
-
 function dayNumber(start: string, today: string) {
   return Math.round((Date.parse(today) - Date.parse(start)) / 86_400_000) + 1;
 }

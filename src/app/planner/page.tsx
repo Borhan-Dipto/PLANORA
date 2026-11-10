@@ -6,8 +6,6 @@ import { requireUserId } from "@/lib/session";
 import { PageFrame } from "@/components/page-frame";
 import { ui, STATUS_LABEL, SOURCE_LABEL } from "@/components/ui";
 
-export const instant = false;
-
 const OPTIONS = [
   { href: "/planner/new/ai", icon: "💬", title: "AI চ্যাট", desc: "কথা বলে বলে AI-এর সাথে প্ল্যান বানান" },
   { href: "/planner/new/auto", icon: "✨", title: "অটোমেটিক", desc: "বিষয় দিন, AI পুরো প্ল্যান বানিয়ে দেবে" },

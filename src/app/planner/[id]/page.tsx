@@ -10,8 +10,6 @@ import { PlanActions } from "@/components/planner/plan-actions";
 import { DownloadJsonButton } from "@/components/planner/download-json-button";
 import { ui, DIFFICULTY_LABEL, STATUS_LABEL, SOURCE_LABEL, WEEKDAY_LABEL, fmtMinutes } from "@/components/ui";
 
-export const instant = false;
-
 const DIFF_TONE = { easy: "text-success", medium: "text-warning", hard: "text-error" } as const;
 
 export default async function PlanPreviewPage({ params }: PageProps<"/planner/[id]">) {

@@ -4,9 +4,6 @@ import { profiles } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
-// TODO(Phase 2): adopt Suspense + `use cache: private` streaming pattern.
-export const instant = false;
-
 export default async function AdminPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

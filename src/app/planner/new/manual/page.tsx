@@ -4,8 +4,6 @@ import { emptyPlan } from "@/lib/plan/schema";
 import { PageFrame } from "@/components/page-frame";
 import { PlanEditor } from "@/components/planner/plan-editor";
 
-export const instant = false;
-
 export default async function ManualPlannerPage() {
   const userId = await requireUserId();
   const tier = await getUserTier(userId);

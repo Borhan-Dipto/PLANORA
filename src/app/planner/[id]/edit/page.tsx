@@ -7,8 +7,6 @@ import { getUserTier } from "@/lib/plan/tier";
 import { PageFrame } from "@/components/page-frame";
 import { PlanEditor } from "@/components/planner/plan-editor";
 
-export const instant = false;
-
 export default async function EditPlanPage({ params }: PageProps<"/planner/[id]/edit">) {
   const { id } = await params;
   const userId = await requireUserId();

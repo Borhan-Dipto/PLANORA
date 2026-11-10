@@ -2,7 +2,6 @@ import { requireUserId } from "@/lib/session";
 import { PageFrame } from "@/components/page-frame";
 import { AiChat } from "@/components/planner/ai-chat";
 
-export const instant = false;
 export const maxDuration = 120;
 
 export default async function AiPlannerPage() {
