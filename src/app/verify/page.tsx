@@ -17,7 +17,7 @@ function VerifyForm() {
       <div>
         <h1 className="text-xl font-semibold">কোড যাচাই করুন</h1>
         <p className="mt-1 text-sm text-muted">
-          <span className="font-medium text-foreground">{email}</span> -এ পাঠানো ৬-সংখ্যার কোডটি বসান।
+          <span className="font-medium text-foreground">{email}</span> -এ পাঠানো ৮-সংখ্যার কোডটি বসান।
         </p>
       </div>
       <form action={action} className="space-y-4">

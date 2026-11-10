@@ -6,7 +6,7 @@ export const emailSchema = z.object({
 
 export const otpSchema = z.object({
   email: z.string().trim().toLowerCase().email(),
-  token: z.string().trim().min(6, "কোডটি সঠিক নয়").max(8, "কোডটি সঠিক নয়"),
+  token: z.string().trim().length(8, "কোডটি সঠিক নয়"),
 });
 
 export type EmailInput = z.infer<typeof emailSchema>;

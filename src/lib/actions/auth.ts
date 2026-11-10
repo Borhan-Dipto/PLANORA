@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 
 type ActionResult = { error?: string };
 
-/** Sends a 6-digit OTP to the given email. Creates the account on first use. */
+/** Sends an 8-digit OTP to the given email. Creates the account on first use. */
 export async function sendEmailOtp(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   const parsed = emailSchema.safeParse({ email: formData.get("email") });
   if (!parsed.success) return { error: parsed.error.issues[0].message };

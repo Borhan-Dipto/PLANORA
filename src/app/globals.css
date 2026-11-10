@@ -74,3 +74,26 @@ button {
 button:active:not(:disabled) {
   transform: scale(0.98);
 }
+
+/* 3D floating planner illustration on the auth pages (login/signup/verify). */
+@keyframes float-a {
+  0%, 100% { transform: translate3d(0, 0, 60px) rotateX(8deg) rotateY(-14deg) rotateZ(-3deg); }
+  50% { transform: translate3d(0, -14px, 60px) rotateX(6deg) rotateY(-14deg) rotateZ(-3deg); }
+}
+@keyframes float-b {
+  0%, 100% { transform: translate3d(34px, 46px, 10px) rotateX(4deg) rotateY(10deg) rotateZ(4deg); }
+  50% { transform: translate3d(34px, 32px, 10px) rotateX(6deg) rotateY(10deg) rotateZ(4deg); }
+}
+@keyframes float-c {
+  0%, 100% { transform: translate3d(-120px, 96px, -40px) rotateX(10deg) rotateY(-6deg) rotateZ(-6deg); }
+  50% { transform: translate3d(-120px, 110px, -40px) rotateX(10deg) rotateY(-6deg) rotateZ(-6deg); }
+}
+@keyframes drift-glow {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-3%, 4%) scale(1.06); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-scene * {
+    animation: none !important;
+  }
+}
