@@ -90,6 +90,22 @@ export default async function DashboardPage() {
               </span>
             )}
           </div>
+          {todayMin > 0 && (
+            <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <div className="rounded-lg bg-background p-3 text-center">
+                <p className="text-xs text-muted">আজ মোট</p>
+                <p className="mt-1 text-lg font-semibold">{fmtMinutes(todayMin)}</p>
+              </div>
+              <div className="rounded-lg bg-background p-3 text-center">
+                <p className="text-xs text-muted">শেষ হয়েছে</p>
+                <p className="mt-1 text-lg font-semibold text-success">{fmtMinutes(todayDone)}</p>
+              </div>
+              <div className="col-span-2 rounded-lg bg-background p-3 text-center sm:col-span-1">
+                <p className="text-xs text-muted">বাকি আছে</p>
+                <p className="mt-1 text-lg font-semibold text-accent">{fmtMinutes(Math.max(0, todayMin - todayDone))}</p>
+              </div>
+            </div>
+          )}
           {notStarted ? (
             <p className="text-sm text-muted">প্ল্যান শুরু হবে {plan.startDate} তারিখে। প্রস্তুত থাকুন! 💪</p>
           ) : isRevision && !study.length ? (
