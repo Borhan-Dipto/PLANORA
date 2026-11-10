@@ -181,6 +181,7 @@ export async function aiChatTurn(
     const turn = chatTurnSchema.parse(raw);
     return { ok: true, ...turn };
   } catch (e) {
+    if (!(e instanceof AiError)) console.error("AI action failed", e);
     return { ok: false, error: e instanceof AiError ? e.message : "কিছু একটা ভুল হয়েছে" };
   }
 }
@@ -236,6 +237,7 @@ Today: ${todayIso()}`;
     if (!n.ok) return n;
     return { ok: true, id: await insertDraft(userId, "automatic", n.data) };
   } catch (e) {
+    if (!(e instanceof AiError)) console.error("AI action failed", e);
     return { ok: false, error: e instanceof AiError ? e.message : "কিছু একটা ভুল হয়েছে" };
   }
 }
