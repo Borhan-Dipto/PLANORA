@@ -9,7 +9,7 @@ import { addDays, type PlanData } from "@/lib/plan/schema";
 
 export type NewTask = {
   date: string;
-  kind: "study" | "habit";
+  kind: "study" | "habit" | "revision";
   subjectId: string | null;
   topicId: string | null;
   subjectName: string | null;
@@ -35,13 +35,15 @@ export function cycleEnd(plan: PlanData) {
   return addDays(plan.startDate, plan.learningDays + plan.revisionDays - 1);
 }
 
-function datesBetween(from: string, to: string, weekdays: number[]) {
+export function datesBetween(from: string, to: string, weekdays: number[]) {
   const out: string[] = [];
   for (let d = from; d <= to; d = addDays(d, 1)) {
     if (weekdays.includes(new Date(d + "T00:00:00Z").getUTCDay())) out.push(d);
   }
   return out;
 }
+
+const round5 = (n: number) => Math.max(5, Math.round(n / 5) * 5);
 
 export function buildSchedule(
   plan: PlanData,
@@ -94,7 +96,6 @@ export function buildSchedule(
   const dayTotals = new Map<string, number>();
   // Cumulative "ideal" minutes that should be done by the end of day d — keeps the error from piling up.
   const ideal = (d: number) => (total * (d + 1)) / days.length;
-  const round5 = (n: number) => Math.max(5, Math.round(n / 5) * 5);
 
   if (days.length) {
     for (const { q, t } of order) {
@@ -165,4 +166,74 @@ export function buildSchedule(
   const capacity = Math.max(maxDay, plan.dailyStudyMinutes);
   // Small spill-over (≤ 15%) from whole-topic packing is normal; more than that means the plan doesn't fit.
   return { tasks, capacity, overloaded: maxDay > plan.dailyStudyMinutes * 1.15, studyDays: days.length };
+}
+
+const DIFFICULTY_WEIGHT = { easy: 1, medium: 2, hard: 3 } as const;
+/** Revision is a second pass, not a repeat of day one — a fraction of the original study time is enough. */
+const REVISION_RATIO = 0.35;
+const MIN_REVISION_MINUTES = 10;
+
+/**
+ * Builds the revision-day tasks (every topic in the plan, once), for the revision window
+ * (the days after `learningEnd` through `cycleEnd`). Harder topics and higher-priority subjects
+ * are scheduled earlier in the window — while the most revision time is still left before the
+ * exam — and get more minutes. If everything doesn't fit in the available revision days at full
+ * strength, every topic's time is scaled down proportionally rather than dropping any topic.
+ */
+export function buildRevisionTasks(plan: PlanData, from: string): NewTask[] {
+  const windowStart = addDays(learningEnd(plan), 1);
+  const start = from > windowStart ? from : windowStart;
+  const end = cycleEnd(plan);
+  if (start > end) return [];
+  const days = datesBetween(start, end, plan.studyWeekdays);
+  if (!days.length) return [];
+
+  const items = plan.subjects.flatMap((s) =>
+    s.topics.map((t) => ({
+      subjectId: s.id,
+      subjectName: s.name,
+      topicId: t.id,
+      title: t.name,
+      minutes: Math.max(MIN_REVISION_MINUTES, round5(t.estimatedMinutes * REVISION_RATIO)),
+      weight: DIFFICULTY_WEIGHT[t.difficulty] * Math.max(1, s.priority),
+    }))
+  );
+  if (!items.length) return [];
+
+  const totalRaw = items.reduce((n, it) => n + it.minutes, 0);
+  const budget = days.length * plan.dailyStudyMinutes;
+  const scale = totalRaw > budget ? budget / totalRaw : 1;
+  if (scale < 1) items.forEach((it) => (it.minutes = Math.max(MIN_REVISION_MINUTES, round5(it.minutes * scale))));
+
+  // Hardest / highest-priority topics first, so they land earliest in the revision window.
+  items.sort((a, b) => b.weight - a.weight);
+
+  const tasks: NewTask[] = [];
+  let day = 0;
+  let used = 0;
+  let sort = 0;
+  for (const it of items) {
+    if (day < days.length - 1 && used > 0 && used + it.minutes > plan.dailyStudyMinutes * 1.1) {
+      day++;
+      used = 0;
+    }
+    tasks.push({
+      date: days[Math.min(day, days.length - 1)],
+      kind: "revision",
+      subjectId: it.subjectId,
+      topicId: it.topicId,
+      subjectName: it.subjectName,
+      title: `🔁 ${it.title}`,
+      minutes: it.minutes,
+      part: 1,
+      parts: 1,
+      sort: sort++,
+    });
+    used += it.minutes;
+    if (day < days.length - 1 && used >= plan.dailyStudyMinutes) {
+      day++;
+      used = 0;
+    }
+  }
+  return tasks;
 }

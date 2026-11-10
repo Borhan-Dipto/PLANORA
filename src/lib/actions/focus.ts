@@ -41,7 +41,8 @@ export async function startFocusSession(taskId: string): Promise<{ ok: true; ses
   if (existing) return { ok: true, session: toSession(existing) };
 
   const [task] = await db.select().from(planTasks).where(and(eq(planTasks.id, taskId), eq(planTasks.userId, userId)));
-  if (!task || task.kind !== "study" || task.status !== "pending") return { ok: false, error: "টপিকটি পাওয়া যায়নি বা শুরু করা যাচ্ছে না" };
+  if (!task || (task.kind !== "study" && task.kind !== "revision") || task.status !== "pending")
+    return { ok: false, error: "টপিকটি পাওয়া যায়নি বা শুরু করা যাচ্ছে না" };
 
   const [session] = await db
     .insert(focusSessions)

@@ -113,7 +113,7 @@ export default async function DashboardPage() {
           <h2 className="mb-3 font-semibold">আজকের পড়ার তালিকা</h2>
           {notStarted ? (
             <p className="text-sm text-muted">প্ল্যান শুরু হবে {plan.startDate} তারিখে। প্রস্তুত থাকুন! 💪</p>
-          ) : isRevision && !study.length ? (
+          ) : isRevision && !tasks.length ? (
             <p className="text-sm text-muted">🔁 আজ রিভিশনের দিন — আগের কঠিন টপিকগুলো আবার দেখে নিন।</p>
           ) : tasks.length ? (
             <TaskList tasks={tasks} showFocusStart />

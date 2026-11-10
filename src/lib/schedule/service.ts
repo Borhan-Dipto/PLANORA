@@ -3,7 +3,7 @@ import { and, eq, inArray, lt, gte, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { plans, planTasks, profiles } from "@/db/schema";
 import type { PlanData } from "@/lib/plan/schema";
-import { buildSchedule, cycleEnd } from "./engine";
+import { buildRevisionTasks, buildSchedule, cycleEnd } from "./engine";
 
 /** Today's date (YYYY-MM-DD) in the user's timezone. */
 export async function todayFor(userId: string) {
@@ -47,10 +47,14 @@ export async function regenerateSchedule(planId: string, userId: string, plan: P
       .where(
         and(eq(planTasks.planId, planId), eq(planTasks.kind, "habit"), eq(planTasks.status, "pending"), gte(planTasks.date, from))
       );
+    await tx
+      .delete(planTasks)
+      .where(and(eq(planTasks.planId, planId), eq(planTasks.kind, "revision"), eq(planTasks.status, "pending")));
 
     const { tasks } = buildSchedule(plan, from, remaining);
-    for (let i = 0; i < tasks.length; i += 500) {
-      await tx.insert(planTasks).values(tasks.slice(i, i + 500).map((t) => ({ ...t, planId, userId })));
+    const allTasks = [...tasks, ...buildRevisionTasks(plan, from)];
+    for (let i = 0; i < allTasks.length; i += 500) {
+      await tx.insert(planTasks).values(allTasks.slice(i, i + 500).map((t) => ({ ...t, planId, userId })));
     }
   });
 }
@@ -71,7 +75,12 @@ export async function missedCount(planId: string, today: string) {
     .select({ c: sql<number>`count(*)::int` })
     .from(planTasks)
     .where(
-      and(eq(planTasks.planId, planId), eq(planTasks.kind, "study"), eq(planTasks.status, "pending"), lt(planTasks.date, today))
+      and(
+        eq(planTasks.planId, planId),
+        inArray(planTasks.kind, ["study", "revision"]),
+        eq(planTasks.status, "pending"),
+        lt(planTasks.date, today)
+      )
     );
   return r?.c ?? 0;
 }

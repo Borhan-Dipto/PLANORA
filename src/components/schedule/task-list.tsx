@@ -36,7 +36,7 @@ export function TaskList({ tasks, readOnly = false, showFocusStart = false }: { 
     <ul className="space-y-2">
       {items.map((t) => {
         const done = t.status === "done";
-        const canFocus = showFocusStart && !readOnly && t.kind === "study" && !done;
+        const canFocus = showFocusStart && !readOnly && (t.kind === "study" || t.kind === "revision") && !done;
         return (
           <li key={t.id} className="flex items-stretch gap-2">
             <button

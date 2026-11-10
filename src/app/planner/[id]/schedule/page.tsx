@@ -54,7 +54,7 @@ export default async function SchedulePage({ params }: PageProps<"/planner/[id]/
         {editable && <RescheduleBanner planId={id} missed={missed} />}
         {groups.map((g) => {
           const isCurrent = g.dates.includes(today) || (today < d.startDate && g === groups[0]);
-          const mins = g.dates.flatMap((x) => byDate.get(x) ?? []).filter((t) => t.kind === "study");
+          const mins = g.dates.flatMap((x) => byDate.get(x) ?? []).filter((t) => t.kind === "study" || t.kind === "revision");
           const done = mins.filter((t) => t.status === "done").reduce((n, t) => n + t.minutes, 0);
           const total = mins.reduce((n, t) => n + t.minutes, 0);
           return (
@@ -90,9 +90,7 @@ export default async function SchedulePage({ params }: PageProps<"/planner/[id]/
                       {items.length ? (
                         <TaskList tasks={items} readOnly={!editable || date > today} />
                       ) : (
-                        <p className="text-xs text-muted">
-                          {date > lEnd ? "রিভিশন (Phase 6-এ স্বয়ংক্রিয় রিভিশন যোগ হবে)" : "বিশ্রাম / কোনো পড়া নেই"}
-                        </p>
+                        <p className="text-xs text-muted">বিশ্রাম / কোনো পড়া নেই</p>
                       )}
                     </div>
                   );
