@@ -60,6 +60,21 @@ export function PlanActions({
             )}
           </>
         )}
+        {status === "active" && (
+          <>
+            <Link href={`/planner/${id}/schedule`} className={`${ui.btn} ${ui.primary}`}>
+              📅 সময়সূচি
+            </Link>
+            <Link href={`/planner/${id}/edit`} className={`${ui.btn} ${ui.secondary}`}>
+              ✎ এডিট
+            </Link>
+          </>
+        )}
+        {(status === "completed" || status === "archived") && (
+          <Link href={`/planner/${id}/schedule`} className={`${ui.btn} ${ui.secondary}`}>
+            📅 সময়সূচি
+          </Link>
+        )}
         {status === "active" &&
           (confirm === "archive" ? (
             <button disabled={pending} onClick={() => run(() => archivePlan(id))} className={`${ui.btn} ${ui.danger}`}>

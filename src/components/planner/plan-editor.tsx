@@ -23,11 +23,13 @@ export function PlanEditor({
   planId,
   source,
   isPremium,
+  active = false,
 }: {
   initial: PlanData;
   planId: string | null;
   source: Source;
   isPremium: boolean;
+  active?: boolean;
 }) {
   const router = useRouter();
   const [plan, setPlan] = useState<PlanData>(initial);
@@ -56,6 +58,11 @@ export function PlanEditor({
 
   return (
     <div className="space-y-4 pb-24">
+      {active && (
+        <p className="rounded-lg border border-accent/30 bg-accent/10 p-3 text-sm">
+          ✎ চলমান প্ল্যান এডিট করছেন। সেভ করলে যা পড়া শেষ হয়েছে তা ঠিক থাকবে, আর আজ থেকে বাকি পড়া নতুন করে সাজানো হবে।
+        </p>
+      )}
       <JsonImport
         onImport={(imported) =>
           setPlan((p) => ({ ...imported, revisionDays: isPremium ? imported.revisionDays : p.revisionDays }))
@@ -88,7 +95,13 @@ export function PlanEditor({
           </div>
           <div>
             <label className={ui.label}>শুরুর তারিখ *</label>
-            <input type="date" className={ui.input} value={plan.startDate} onChange={(e) => set("startDate", e.target.value)} />
+            <input
+              type="date"
+              className={ui.input}
+              value={plan.startDate}
+              disabled={active}
+              onChange={(e) => set("startDate", e.target.value)}
+            />
           </div>
           <div>
             <label className={ui.label}>পরীক্ষার তারিখ (ঐচ্ছিক)</label>
@@ -191,7 +204,7 @@ export function PlanEditor({
         <div className="mx-auto flex max-w-4xl flex-wrap items-center gap-3">
           {error && <p className="min-w-0 flex-1 text-sm text-error">{error}</p>}
           <button onClick={save} disabled={pending} className={`${ui.btn} ${ui.primary} ml-auto w-full sm:w-auto`}>
-            {pending ? "সেভ হচ্ছে…" : "সেভ করে প্রিভিউ দেখুন"}
+            {pending ? "সেভ হচ্ছে…" : active ? "সেভ করে সময়সূচি আপডেট করুন" : "সেভ করে প্রিভিউ দেখুন"}
           </button>
         </div>
       </div>

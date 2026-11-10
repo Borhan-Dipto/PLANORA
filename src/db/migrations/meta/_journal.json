@@ -15,6 +15,13 @@
       "when": 1794304939540,
       "tag": "0001_plans",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794309816486,
+      "tag": "0002_plan_tasks",
+      "breakpoints": true
     }
   ]
 }

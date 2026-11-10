@@ -15,11 +15,17 @@ export default async function EditPlanPage({ params }: PageProps<"/planner/[id]/
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
   const [plan] = await db.select().from(plans).where(and(eq(plans.id, id), eq(plans.userId, userId)));
   if (!plan) notFound();
-  if (plan.status !== "draft") redirect(`/planner/${id}`);
+  if (plan.status !== "draft" && plan.status !== "active") redirect(`/planner/${id}`);
   const tier = await getUserTier(userId);
   return (
     <PageFrame title="প্ল্যান এডিট" back={`/planner/${id}`}>
-      <PlanEditor initial={plan.planData} planId={id} source={plan.source} isPremium={tier === "premium"} />
+      <PlanEditor
+        initial={plan.planData}
+        planId={id}
+        source={plan.source}
+        isPremium={tier === "premium"}
+        active={plan.status === "active"}
+      />
     </PageFrame>
   );
 }

@@ -9,6 +9,7 @@ import { analyzePlan, planDataSchema, FREE_REVISION_DAYS, todayIso, type PlanDat
 import { aiDraftSchema, chatTurnSchema, draftToPlan, type AiDraft } from "@/lib/plan/draft";
 import { AiError, chatResponseSchema, draftResponseSchema, generateJson, type GeminiContent } from "@/lib/ai/gemini";
 import { getUserTier } from "@/lib/plan/tier";
+import { regenerateSchedule, todayFor } from "@/lib/schedule/service";
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 type Source = "manual" | "ai_chat" | "automatic";
@@ -33,7 +34,7 @@ async function insertDraft(userId: string, source: Source, data: PlanData) {
   return row.id;
 }
 
-/** Create (planId = null) or update a draft plan. */
+/** Create (planId = null) or update a draft or active plan. Editing an active plan reschedules from today. */
 export async function savePlan(planId: string | null, source: Source, input: unknown): Promise<Result<{ id: string }>> {
   const userId = await requireUserId();
   const n = await normalise(userId, input);
@@ -41,12 +42,27 @@ export async function savePlan(planId: string | null, source: Source, input: unk
 
   if (!planId) return { ok: true, id: await insertDraft(userId, source, n.data) };
 
-  const updated = await db
+  const [existing] = await db.select().from(plans).where(and(eq(plans.id, planId), eq(plans.userId, userId)));
+  if (!existing || (existing.status !== "draft" && existing.status !== "active"))
+    return { ok: false, error: "এই প্ল্যানটি আর এডিট করা যায় না" };
+
+  const data = n.data;
+  if (existing.status === "active") {
+    // The cycle has started — its dates are fixed; only the content changes.
+    data.startDate = existing.planData.startDate;
+    const blocking = analyzePlan(data).issues.find((i) => i.level === "error");
+    if (blocking) return { ok: false, error: blocking.message };
+  }
+
+  await db
     .update(plans)
-    .set({ title: n.data.title, planData: n.data, startDate: n.data.startDate, updatedAt: new Date() })
-    .where(and(eq(plans.id, planId), eq(plans.userId, userId), eq(plans.status, "draft")))
-    .returning({ id: plans.id });
-  if (!updated.length) return { ok: false, error: "শুধু ড্রাফট প্ল্যান এডিট করা যায়" };
+    .set({ title: data.title, planData: data, startDate: data.startDate, updatedAt: new Date() })
+    .where(eq(plans.id, planId));
+  if (existing.status === "active") {
+    await regenerateSchedule(planId, userId, data, await todayFor(userId));
+    revalidatePath("/dashboard");
+    revalidatePath(`/planner/${planId}/schedule`);
+  }
   revalidatePath(`/planner/${planId}`);
   return { ok: true, id: planId };
 }
@@ -66,10 +82,14 @@ export async function approvePlan(planId: string): Promise<Result> {
     .where(and(eq(plans.userId, userId), eq(plans.status, "active"), ne(plans.id, planId)));
   if (active.c > 0) return { ok: false, error: "আপনার একটি চলমান প্ল্যান আছে। আগে সেটি আর্কাইভ করুন।" };
 
+  // A draft whose start date has already passed starts today, so the full 30 days are available.
+  const today = await todayFor(userId);
+  const data = plan.planData.startDate < today ? { ...plan.planData, startDate: today } : plan.planData;
   await db
     .update(plans)
-    .set({ status: "active", approvedAt: new Date(), updatedAt: new Date() })
+    .set({ status: "active", planData: data, startDate: data.startDate, approvedAt: new Date(), updatedAt: new Date() })
     .where(eq(plans.id, planId));
+  await regenerateSchedule(planId, userId, data, today);
   revalidatePath("/planner");
   revalidatePath("/dashboard");
   return { ok: true };
