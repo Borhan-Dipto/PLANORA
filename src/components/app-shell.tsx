@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { href: "/subjects", key: "subjects" as const, icon: "📚" },
   { href: "/revision", key: "revision" as const, icon: "🔁" },
   { href: "/progress", key: "progress" as const, icon: "📈" },
+  { href: "/billing", key: "billing" as const, icon: "💎" },
 ];
 
 const SETTINGS_ITEM = { href: "/settings", key: "settings" as const, icon: "⚙️" };

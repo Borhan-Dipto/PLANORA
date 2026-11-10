@@ -1,8 +1,31 @@
 import "server-only";
+import { and, eq, gt, desc } from "drizzle-orm";
+import { db } from "@/db/client";
+import { subscriptions } from "@/db/schema";
 
 export type Tier = "free" | "premium";
 
-/** Subscription tier. Phase 7 (payments/activation codes) will read the real subscription here. */
-export async function getUserTier(_userId: string): Promise<Tier> {
-  return "free";
+/** A user is premium while they have any subscription row whose expiresAt is still in the future. */
+export async function getUserTier(userId: string): Promise<Tier> {
+  const [row] = await db
+    .select({ expiresAt: subscriptions.expiresAt })
+    .from(subscriptions)
+    .where(and(eq(subscriptions.userId, userId), gt(subscriptions.expiresAt, new Date())))
+    .orderBy(desc(subscriptions.expiresAt))
+    .limit(1);
+  return row ? "premium" : "free";
 }
+
+/** The latest date premium runs out, across every (possibly stacked) subscription row — null if never subscribed. */
+export async function getPremiumExpiry(userId: string): Promise<Date | null> {
+  const [row] = await db
+    .select({ expiresAt: subscriptions.expiresAt })
+    .from(subscriptions)
+    .where(eq(subscriptions.userId, userId))
+    .orderBy(desc(subscriptions.expiresAt))
+    .limit(1);
+  if (!row) return null;
+  return row.expiresAt > new Date() ? row.expiresAt : null;
+}
+
+export const AI_DAILY_LIMIT: Record<Tier, number> = { free: 10, premium: 100 };

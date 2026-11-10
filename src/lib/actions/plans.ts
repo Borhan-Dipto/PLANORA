@@ -8,13 +8,11 @@ import { requireUserId } from "@/lib/session";
 import { analyzePlan, planDataSchema, FREE_REVISION_DAYS, todayIso, type PlanData } from "@/lib/plan/schema";
 import { aiDraftSchema, chatTurnSchema, draftToPlan, type AiDraft } from "@/lib/plan/draft";
 import { AiError, chatResponseSchema, draftResponseSchema, generateJson, type GeminiContent } from "@/lib/ai/gemini";
-import { getUserTier } from "@/lib/plan/tier";
+import { getUserTier, AI_DAILY_LIMIT } from "@/lib/plan/tier";
 import { regenerateSchedule, todayFor } from "@/lib/schedule/service";
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 type Source = "manual" | "ai_chat" | "automatic";
-
-const DAILY_AI_LIMIT = 30;
 
 async function normalise(userId: string, input: unknown): Promise<Result<{ data: PlanData }>> {
   const parsed = planDataSchema.safeParse(input);
@@ -125,12 +123,17 @@ export async function duplicatePlan(planId: string): Promise<Result<{ id: string
 /* ---------------- AI ---------------- */
 
 async function checkQuota(userId: string): Promise<string | null> {
+  const tier = await getUserTier(userId);
+  const limit = AI_DAILY_LIMIT[tier];
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const [r] = await db
     .select({ c: count() })
     .from(aiUsageLogs)
     .where(and(eq(aiUsageLogs.userId, userId), gte(aiUsageLogs.createdAt, since)));
-  return r.c >= DAILY_AI_LIMIT ? `আজকের AI লিমিট (${DAILY_AI_LIMIT}) শেষ। কাল আবার চেষ্টা করুন।` : null;
+  if (r.c < limit) return null;
+  return tier === "free"
+    ? `আজকের ফ্রি AI লিমিট (${limit}) শেষ। প্রিমিয়ামে আপগ্রেড করুন অথবা কাল আবার চেষ্টা করুন।`
+    : `আজকের AI লিমিট (${limit}) শেষ। কাল আবার চেষ্টা করুন।`;
 }
 
 async function callAi(userId: string, feature: string, args: Parameters<typeof generateJson>[0]) {
