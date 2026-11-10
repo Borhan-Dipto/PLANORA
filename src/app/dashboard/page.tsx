@@ -137,7 +137,9 @@ export default async function DashboardPage() {
   return (
     <AppShell dict={dict} locale={locale}>
       <header className="flex items-center justify-between border-b border-border p-4">
-        <span className="font-semibold text-accent">PLANORA</span>
+        <Link href="/dashboard" className="font-semibold text-accent">
+          PLANORA
+        </Link>
         <form action={signOut}>
           <button className="rounded-md border border-border px-3 py-1.5 text-sm text-muted hover:text-foreground">
             {dict.auth.logout}
