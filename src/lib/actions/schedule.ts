@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db/client";
 import { plans, planTasks } from "@/db/schema";
@@ -34,12 +34,17 @@ export async function rescheduleMissed(planId: string) {
 }
 
 /**
- * Manually fix one day's (today or tomorrow's) per-subject study minutes — for when real class
- * durations are only known that morning or the night before. Replaces that day's pending study/
- * revision tasks with ones built from the given minutes, picking topics in each subject's own
- * order and locking the result so the automatic engine never touches that day again.
+ * Manually fix one day's (today or tomorrow's) study plan topic-by-topic — for when real class
+ * durations are only known that morning or the night before, and the user needs to see and pick
+ * exactly which topic each block of time goes to. Replaces that day's pending study/revision
+ * tasks with the given topic+minutes choices and locks them so the automatic engine never
+ * touches that day again.
  */
-export async function planMyDay(planId: string, date: string, allocations: { subjectId: string; minutes: number }[]) {
+export async function planMyDay(
+  planId: string,
+  date: string,
+  allocations: { subjectId: string; topicId: string; minutes: number }[]
+) {
   const userId = await requireUserId();
   const [plan] = await db
     .select()
@@ -56,24 +61,33 @@ export async function planMyDay(planId: string, date: string, allocations: { sub
   if (date > cycleEnd(data)) return { ok: false as const, error: "এই তারিখ প্ল্যানের বাইরে" };
 
   const cleanAllocs = allocations.filter((a) => Number.isFinite(a.minutes) && a.minutes > 0);
-  if (!cleanAllocs.length) return { ok: false as const, error: "অন্তত একটা বিষয়ের জন্য সময় দিন" };
+  if (!cleanAllocs.length) return { ok: false as const, error: "অন্তত একটা টপিকের জন্য সময় দিন" };
+
+  const newTasks: (typeof planTasks.$inferInsert)[] = [];
+  let sort = 0;
+  for (const alloc of cleanAllocs) {
+    const subject = data.subjects.find((s) => s.id === alloc.subjectId);
+    const topic = subject?.topics.find((t) => t.id === alloc.topicId);
+    if (!subject || !topic) continue;
+    newTasks.push({
+      planId,
+      userId,
+      date,
+      kind,
+      subjectId: subject.id,
+      topicId: topic.id,
+      subjectName: subject.name,
+      title: topic.name,
+      minutes: round5(alloc.minutes),
+      part: 1,
+      parts: 1,
+      sort: sort++,
+      locked: true,
+    });
+  }
+  if (!newTasks.length) return { ok: false as const, error: "এই টপিকগুলো প্ল্যানে পাওয়া যায়নি" };
 
   await db.transaction(async (tx) => {
-    // Minutes already spoken for elsewhere (done, or locked on a different day) — this day's own
-    // old rows don't count, since we're about to replace them.
-    const spoken = await tx
-      .select({ topicId: planTasks.topicId, minutes: sql<number>`sum(${planTasks.minutes})::int` })
-      .from(planTasks)
-      .where(
-        and(
-          eq(planTasks.planId, planId),
-          inArray(planTasks.kind, ["study", "revision"]),
-          sql`(${planTasks.status} = 'done' or (${planTasks.locked} = true and ${planTasks.date} <> ${date}))`
-        )
-      )
-      .groupBy(planTasks.topicId);
-    const spokenBy = new Map(spoken.map((d) => [d.topicId, d.minutes]));
-
     await tx
       .delete(planTasks)
       .where(
@@ -84,41 +98,7 @@ export async function planMyDay(planId: string, date: string, allocations: { sub
           eq(planTasks.status, "pending")
         )
       );
-
-    const newTasks: (typeof planTasks.$inferInsert)[] = [];
-    let sort = 0;
-    for (const alloc of cleanAllocs) {
-      const subject = data.subjects.find((s) => s.id === alloc.subjectId);
-      if (!subject) continue;
-      let budget = alloc.minutes;
-      const chunks: { topicId: string; title: string; minutes: number }[] = [];
-      for (const topic of subject.topics) {
-        if (budget <= 0) break;
-        const left = topic.estimatedMinutes - (spokenBy.get(topic.id) ?? 0);
-        if (left < 15) continue; // tiny leftovers count as finished
-        const take = Math.min(left, budget);
-        chunks.push({ topicId: topic.id, title: topic.name, minutes: round5(take) });
-        budget -= take;
-      }
-      chunks.forEach((c, i) =>
-        newTasks.push({
-          planId,
-          userId,
-          date,
-          kind,
-          subjectId: subject.id,
-          topicId: c.topicId,
-          subjectName: subject.name,
-          title: c.title,
-          minutes: c.minutes,
-          part: i + 1,
-          parts: chunks.length,
-          sort: sort++,
-          locked: true,
-        })
-      );
-    }
-    if (newTasks.length) await tx.insert(planTasks).values(newTasks);
+    await tx.insert(planTasks).values(newTasks);
   });
 
   revalidatePath("/dashboard");
