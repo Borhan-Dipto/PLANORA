@@ -16,6 +16,7 @@ import { RescheduleBanner } from "@/components/schedule/reschedule-button";
 import { LiveTimeBudget } from "@/components/schedule/live-time-budget";
 import { LiveClock } from "@/components/live-clock";
 import { ui, fmtMinutes } from "@/components/ui";
+import { Logomark } from "@/components/brand/logomark";
 
 function dayNumber(start: string, today: string) {
   return Math.round((Date.parse(today) - Date.parse(start)) / 86_400_000) + 1;
@@ -144,9 +145,7 @@ export default async function DashboardPage() {
     <AppShell dict={dict} locale={locale}>
       <header className="flex items-center justify-between border-b border-border bg-surface/95 p-4 backdrop-blur md:hidden">
         <Link href="/dashboard" className="flex items-center gap-2" aria-label="PLANORA — ড্যাশবোর্ডে যান">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent text-sm font-bold text-accent-foreground">
-            P
-          </span>
+          <Logomark className="h-7 w-7 shrink-0 drop-shadow-[0_2px_6px_rgba(37,99,235,0.35)]" />
           <span className="font-brand text-base font-bold tracking-tight">PLANORA</span>
         </Link>
         <form action={signOut}>

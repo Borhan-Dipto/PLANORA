@@ -1,3 +1,5 @@
+import { Logomark } from "@/components/brand/logomark";
+
 const FEATURES = [
   { icon: "📅", text: "৩০ দিনের লার্নিং + রিভিশন সাইকেল, পুরোপুরি অটোমেটিক" },
   { icon: "🤖", text: "AI দিয়ে মিনিটে একটা পূর্ণাঙ্গ স্টাডি প্ল্যান বানান" },
@@ -127,9 +129,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
         {/* Marketing panel — desktop only */}
         <div className="hidden flex-1 lg:block">
           <div className="flex items-center gap-2.5">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent text-lg font-bold text-accent-foreground shadow-lg shadow-accent/30">
-              P
-            </span>
+            <Logomark className="h-10 w-10 shrink-0 drop-shadow-[0_4px_10px_rgba(37,99,235,0.4)]" />
             <span className="font-brand text-2xl font-bold tracking-tight">PLANORA</span>
           </div>
           <h1 className="mt-6 text-3xl font-bold leading-tight tracking-tight">
@@ -156,9 +156,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
         {/* Form card */}
         <div className="w-full max-w-sm lg:mx-0">
           <div className="mb-6 flex items-center gap-2 lg:hidden">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent text-base font-bold text-accent-foreground shadow-lg shadow-accent/30">
-              P
-            </span>
+            <Logomark className="h-9 w-9 shrink-0 drop-shadow-[0_3px_8px_rgba(37,99,235,0.4)]" />
             <span className="font-brand text-xl font-bold tracking-tight">PLANORA</span>
           </div>
           {children}

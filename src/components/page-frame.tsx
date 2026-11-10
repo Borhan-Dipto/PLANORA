@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getDictionary, getLocale } from "@/lib/i18n";
 import { AppShell } from "@/components/app-shell";
+import { Logomark } from "@/components/brand/logomark";
 
 /** Authenticated page chrome: shell + sticky header with optional back link. Call requireUserId() first. */
 export async function PageFrame({
@@ -18,12 +19,8 @@ export async function PageFrame({
   return (
     <AppShell dict={dict} locale={locale}>
       <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-surface/95 px-4 py-3 backdrop-blur">
-        <Link
-          href="/dashboard"
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent text-sm font-bold text-accent-foreground md:hidden"
-          aria-label="PLANORA — ড্যাশবোর্ডে যান"
-        >
-          P
+        <Link href="/dashboard" className="shrink-0 md:hidden" aria-label="PLANORA — ড্যাশবোর্ডে যান">
+          <Logomark className="h-7 w-7 drop-shadow-[0_2px_6px_rgba(37,99,235,0.35)]" />
         </Link>
         {back && (
           <Link href={back} className="shrink-0 text-muted hover:text-foreground" aria-label="ফিরে যান">

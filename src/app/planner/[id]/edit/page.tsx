@@ -4,6 +4,7 @@ import { db } from "@/db/client";
 import { plans } from "@/db/schema";
 import { requireUserId } from "@/lib/session";
 import { getUserTier } from "@/lib/plan/tier";
+import { todayFor } from "@/lib/schedule/service";
 import { PageFrame } from "@/components/page-frame";
 import { PlanEditor } from "@/components/planner/plan-editor";
 
@@ -23,6 +24,7 @@ export default async function EditPlanPage({ params }: PageProps<"/planner/[id]/
         source={plan.source}
         isPremium={tier === "premium"}
         active={plan.status === "active"}
+        todayIso={await todayFor(userId)}
       />
     </PageFrame>
   );

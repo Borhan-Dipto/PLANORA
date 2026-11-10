@@ -46,8 +46,11 @@ export async function savePlan(planId: string | null, source: Source, input: unk
 
   const data = n.data;
   if (existing.status === "active") {
-    // The cycle has started — its dates are fixed; only the content changes.
-    data.startDate = existing.planData.startDate;
+    // The cycle has already started, but the user may still push the start date to today or
+    // later (e.g. approved today, actually wants to begin in two days) — never into the past,
+    // since days before today may already have done/locked work.
+    const today = await todayFor(userId);
+    if (data.startDate < today) data.startDate = existing.planData.startDate < today ? today : existing.planData.startDate;
     const blocking = analyzePlan(data).issues.find((i) => i.level === "error");
     if (blocking) return { ok: false, error: blocking.message };
   }

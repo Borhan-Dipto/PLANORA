@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import type { Dictionary } from "@/lib/i18n";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
+import { Logomark } from "@/components/brand/logomark";
 
 const NAV_ITEMS = [
   { href: "/dashboard", key: "dashboard" as const, icon: "🏠" },
@@ -37,9 +38,7 @@ export function AppShell({
       {/* Desktop sidebar */}
       <aside className="hidden w-60 flex-col border-r border-border bg-surface p-4 md:flex">
         <Link href="/dashboard" className="mb-6 flex items-center gap-2 px-1" aria-label="PLANORA — ড্যাশবোর্ডে যান">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent text-sm font-bold text-accent-foreground">
-            P
-          </span>
+          <Logomark className="h-7 w-7 shrink-0 drop-shadow-[0_2px_6px_rgba(37,99,235,0.35)]" />
           <span className="font-brand text-lg font-bold tracking-tight text-foreground">PLANORA</span>
         </Link>
         <nav className="flex flex-1 flex-col gap-0.5">

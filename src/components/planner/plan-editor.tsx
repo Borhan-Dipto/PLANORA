@@ -24,12 +24,15 @@ export function PlanEditor({
   source,
   isPremium,
   active = false,
+  todayIso,
 }: {
   initial: PlanData;
   planId: string | null;
   source: Source;
   isPremium: boolean;
   active?: boolean;
+  /** Today's date (user's timezone) — active plans may only move their start date to today or later. */
+  todayIso?: string;
 }) {
   const router = useRouter();
   // Older stored plans predate per-subject weekdays — fill the default so the editor never sees undefined.
@@ -67,7 +70,7 @@ export function PlanEditor({
     <div className="space-y-4 pb-24">
       {active && (
         <p className="rounded-lg border border-accent/30 bg-accent/10 p-3 text-sm">
-          ✎ চলমান প্ল্যান এডিট করছেন। সেভ করলে যা পড়া শেষ হয়েছে তা ঠিক থাকবে, আর আজ থেকে বাকি পড়া নতুন করে সাজানো হবে।
+          ✎ চলমান প্ল্যান এডিট করছেন। সেভ করলে যা পড়া শেষ হয়েছে তা ঠিক থাকবে, আর আজ (বা নতুন শুরুর তারিখ) থেকে বাকি পড়া নতুন করে সাজানো হবে।
         </p>
       )}
       <JsonImport
@@ -106,9 +109,12 @@ export function PlanEditor({
               type="date"
               className={ui.input}
               value={plan.startDate}
-              disabled={active}
+              min={active ? todayIso : undefined}
               onChange={(e) => set("startDate", e.target.value)}
             />
+            {active && (
+              <p className="mt-1 text-xs text-muted">চলমান প্ল্যানের শুরুর তারিখ আজ বা তার পরে এগিয়ে দেওয়া যাবে — অতীতে নেওয়া যাবে না।</p>
+            )}
           </div>
           <div>
             <label className={ui.label}>পরীক্ষার তারিখ (ঐচ্ছিক)</label>
