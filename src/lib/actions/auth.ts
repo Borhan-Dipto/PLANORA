@@ -14,7 +14,10 @@ export async function sendEmailOtp(_prev: ActionResult, formData: FormData): Pro
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithOtp({
     email: parsed.data.email,
-    options: { shouldCreateUser: true },
+    options: {
+      shouldCreateUser: true,
+      emailRedirectTo: `${process.env.APPLICATION_BASE_URL}/auth/confirm`,
+    },
   });
   if (error) return { error: "কোড পাঠানো যায়নি। আবার চেষ্টা করুন।" };
 
