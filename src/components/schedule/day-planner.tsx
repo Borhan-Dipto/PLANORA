@@ -89,6 +89,21 @@ export function DayPlanner({
 
   const total = picks.reduce((n, p) => n + (p.minutes || 0), 0);
 
+  // Group the picked topics under their subject (in the plan's subject order), so the list
+  // doesn't jumble topics from different subjects together.
+  const groups = useMemo(() => {
+    const order = new Map(subjects.map((s, i) => [s.id, i]));
+    const map = new Map<string, { subjectId: string; subjectName: string; items: typeof picks }>();
+    for (const p of picks) {
+      const f = byTopicId.get(p.topicId);
+      if (!f) continue;
+      const g = map.get(f.subjectId) ?? { subjectId: f.subjectId, subjectName: f.subjectName, items: [] };
+      g.items.push(p);
+      map.set(f.subjectId, g);
+    }
+    return [...map.values()].sort((a, b) => (order.get(a.subjectId) ?? 0) - (order.get(b.subjectId) ?? 0));
+  }, [picks, subjects, byTopicId]);
+
   const save = () => {
     setMsg(null);
     start(async () => {
@@ -126,40 +141,43 @@ export function DayPlanner({
           : "এই দিনের জন্য অটোমেটিক সিস্টেম এখনো কিছু ঠিক করেনি — নিচে থেকে টপিক খুঁজে যোগ করুন।"}
       </p>
 
-      {picks.length > 0 && (
-        <div className="mt-4 space-y-2">
-          {picks.map((p) => {
-            const f = byTopicId.get(p.topicId);
-            if (!f) return null;
-            return (
-              <div key={p.topicId} className="flex items-center gap-3">
-                <span className="min-w-0 flex-1 truncate text-sm">
-                  {f.topicName}
-                  <span className="ml-1.5 text-xs text-muted">({f.subjectName})</span>
-                </span>
-                <div className="w-20 shrink-0">
-                  <input
-                    type="number"
-                    min={0}
-                    step={5}
-                    inputMode="numeric"
-                    value={p.minutes}
-                    onChange={(e) => setPickMinutes(p.topicId, Number(e.target.value))}
-                    className={`${ui.input} text-right`}
-                  />
-                </div>
-                <span className="shrink-0 text-xs text-muted">মি.</span>
-                <button
-                  type="button"
-                  onClick={() => removePick(p.topicId)}
-                  aria-label="বাদ দিন"
-                  className="shrink-0 text-muted hover:text-error"
-                >
-                  ✕
-                </button>
+      {groups.length > 0 && (
+        <div className="mt-4 space-y-4">
+          {groups.map((g) => (
+            <div key={g.subjectId}>
+              <p className="mb-1.5 truncate text-xs font-semibold text-muted">{g.subjectName}</p>
+              <div className="space-y-2 border-l-2 border-border pl-3">
+                {g.items.map((p) => {
+                  const f = byTopicId.get(p.topicId)!;
+                  return (
+                    <div key={p.topicId} className="flex items-center gap-3">
+                      <span className="min-w-0 flex-1 truncate text-sm">{f.topicName}</span>
+                      <div className="w-20 shrink-0">
+                        <input
+                          type="number"
+                          min={0}
+                          step={5}
+                          inputMode="numeric"
+                          value={p.minutes}
+                          onChange={(e) => setPickMinutes(p.topicId, Number(e.target.value))}
+                          className={`${ui.input} text-right`}
+                        />
+                      </div>
+                      <span className="shrink-0 text-xs text-muted">মি.</span>
+                      <button
+                        type="button"
+                        onClick={() => removePick(p.topicId)}
+                        aria-label="বাদ দিন"
+                        className="shrink-0 text-muted hover:text-error"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
       )}
 
