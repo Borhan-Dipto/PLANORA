@@ -2,39 +2,43 @@
 
 import { useActionState } from "react";
 import { sendEmailOtp } from "@/lib/actions/auth";
+import { AuthShell } from "@/components/auth/auth-shell";
+import { ui } from "@/components/ui";
 
 export default function LoginPage() {
   const [state, action, pending] = useActionState(sendEmailOtp, {});
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background p-6">
-      <form
-        action={action}
-        className="w-full max-w-sm space-y-4 rounded-2xl border border-border bg-surface p-6 shadow-[0_8px_24px_rgba(16,24,40,0.08)]"
-      >
-        <div className="flex items-center gap-2">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent text-base font-bold text-accent-foreground">
-            P
-          </span>
-          <h1 className="font-brand text-2xl font-bold tracking-tight text-foreground">PLANORA</h1>
+    <AuthShell>
+      <form action={action} className={`${ui.card} space-y-4 shadow-[0_8px_24px_rgba(16,24,40,0.08)]`}>
+        <div>
+          <h1 className="text-xl font-semibold">লগইন করুন বা নতুন অ্যাকাউন্ট খুলুন</h1>
+          <p className="mt-1 text-sm text-muted">
+            পাসওয়ার্ড লাগবে না — ইমেইল দিন, আমরা একটা ৬-সংখ্যার কোড পাঠাব। নতুন ইমেইল হলে সাথে সাথে নতুন অ্যাকাউন্টও তৈরি হয়ে যাবে।
+          </p>
         </div>
-        <p className="text-sm text-muted">আপনার ইমেইল দিন, আমরা একটা কোড পাঠাব।</p>
-        <input
-          name="email"
-          type="email"
-          required
-          placeholder="you@example.com"
-          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
-        />
+        <div>
+          <label htmlFor="email" className={ui.label}>
+            ইমেইল
+          </label>
+          <input
+            id="email"
+            name="email"
+            type="email"
+            required
+            autoFocus
+            placeholder="you@example.com"
+            className={ui.input}
+          />
+        </div>
         {state?.error && <p className="text-sm text-error">{state.error}</p>}
-        <button
-          type="submit"
-          disabled={pending}
-          className="w-full rounded-lg bg-accent px-3 py-2 font-medium text-accent-foreground shadow-sm shadow-accent/30 hover:opacity-90 disabled:opacity-50"
-        >
-          {pending ? "পাঠানো হচ্ছে..." : "কোড পাঠান"}
+        <button type="submit" disabled={pending} className={`${ui.btn} ${ui.primary} w-full`}>
+          {pending ? "পাঠানো হচ্ছে…" : "কোড পাঠান"}
         </button>
+        <p className="text-center text-xs text-muted">
+          কোড পাঠানোর মাধ্যমেই আপনার ইমেইল যাচাই (ভেরিফাই) হয়ে যায় — আলাদা কিছু করতে হবে না।
+        </p>
       </form>
-    </main>
+    </AuthShell>
   );
 }
