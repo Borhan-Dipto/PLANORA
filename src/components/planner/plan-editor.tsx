@@ -45,7 +45,10 @@ export function PlanEditor({
   const save = () =>
     start(async () => {
       setError("");
-      const res = await savePlan(planId, source, plan);
+      const res = await savePlan(planId, source, {
+        ...plan,
+        dailyTargets: (plan.dailyTargets ?? []).map((x) => x.trim()).filter(Boolean),
+      });
       if (!res.ok) return setError(res.error);
       router.push(`/planner/${res.id}`);
       router.refresh();
@@ -53,7 +56,11 @@ export function PlanEditor({
 
   return (
     <div className="space-y-4 pb-24">
-      <JsonImport onImport={(imported) => setPlan((p) => ({ ...imported, revisionDays: p.revisionDays }))} />
+      <JsonImport
+        onImport={(imported) =>
+          setPlan((p) => ({ ...imported, revisionDays: isPremium ? imported.revisionDays : p.revisionDays }))
+        }
+      />
 
       {/* Plan settings */}
       <section className={ui.card}>
@@ -149,6 +156,17 @@ export function PlanEditor({
         </p>
       </section>
 
+      <section className={ui.card}>
+        <label className={ui.label}>দৈনিক লক্ষ্য / অভ্যাস (প্রতি লাইনে একটি, ঐচ্ছিক)</label>
+        <textarea
+          className={`${ui.input} min-h-20`}
+          value={(plan.dailyTargets ?? []).join("\n")}
+          placeholder={"প্রতিদিন English Newspaper পড়া\nপ্রতিদিন এক পৃষ্ঠা বাংলা লেখা"}
+          onChange={(e) => set("dailyTargets", e.target.value.split("\n").slice(0, 20))}
+          onBlur={() => set("dailyTargets", (plan.dailyTargets ?? []).map((x) => x.trim()).filter(Boolean))}
+        />
+      </section>
+
       <PlanStatsBar stats={stats} />
 
       {/* Subjects */}
@@ -218,6 +236,16 @@ function SubjectCard({
             maxLength={120}
             placeholder="যেমন: বাংলাদেশ বিষয়াবলি"
             onChange={(e) => onChange((s) => ({ ...s, name: e.target.value }))}
+          />
+        </div>
+        <div className="min-w-0 flex-1 basis-48">
+          <label className={ui.label}>কোর্স / ব্যাচ (ঐচ্ছিক)</label>
+          <input
+            className={ui.input}
+            value={subject.course ?? ""}
+            maxLength={200}
+            placeholder="যেমন: Complete 40 Lecture Course"
+            onChange={(e) => onChange((s) => ({ ...s, course: e.target.value }))}
           />
         </div>
         <div className="w-28">

@@ -149,6 +149,8 @@ Rules:
 - Ask at most 2 focused questions per turn.
 - If the user names a known exam (BCS, bank, NTRCA, primary, admission, SSC, HSC…), propose its standard subjects/sections and ask them to confirm or edit.
 - estimatedMinutes = realistic time to learn the topic the first time (usually 30–300); harder topics take longer.
+- If the user pastes a course's class/lecture list, keep EVERY item as a topic in the same order (do not merge or drop), and put the course name in "course".
+- Recurring daily habits (newspaper reading, daily writing practice, "2–3 topics per day") go in dailyTargets, not as topics.
 - ALWAYS return the full current draft containing everything known so far (empty strings / 0 / [] when unknown).
 - ready = true only when there is at least one subject with topics AND daily study time is known.
 - When ready, briefly summarise and tell them to press "প্ল্যান তৈরি করো" (Create plan).

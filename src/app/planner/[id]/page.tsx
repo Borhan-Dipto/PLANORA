@@ -7,6 +7,7 @@ import { analyzePlan } from "@/lib/plan/schema";
 import { PageFrame } from "@/components/page-frame";
 import { PlanStatsBar, IssueList } from "@/components/planner/plan-summary";
 import { PlanActions } from "@/components/planner/plan-actions";
+import { DownloadJsonButton } from "@/components/planner/download-json-button";
 import { ui, DIFFICULTY_LABEL, STATUS_LABEL, SOURCE_LABEL, WEEKDAY_LABEL, fmtMinutes } from "@/components/ui";
 
 export const instant = false;
@@ -41,18 +42,36 @@ export default async function PlanPreviewPage({ params }: PageProps<"/planner/[i
             {d.examDate && <Info k="পরীক্ষা" v={d.examDate} />}
             <Info k="পড়ার দিন" v={d.studyWeekdays.length === 7 ? "প্রতিদিন" : d.studyWeekdays.map((w) => WEEKDAY_LABEL[w]).join(", ")} />
           </dl>
+          {(d.dailyTargets?.length ?? 0) > 0 && (
+            <div className="mt-4 border-t border-border pt-3">
+              <p className="text-xs text-muted">দৈনিক লক্ষ্য</p>
+              <ul className="mt-1 space-y-1 text-sm">
+                {d.dailyTargets!.map((t, i) => (
+                  <li key={i}>• {t}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </section>
 
         <PlanStatsBar stats={stats} />
         <IssueList issues={issues} />
-        <PlanActions id={plan.id} status={plan.status} canApprove={canApprove} />
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+          <div className="flex-1">
+            <PlanActions id={plan.id} status={plan.status} canApprove={canApprove} />
+          </div>
+          <DownloadJsonButton plan={d} />
+        </div>
 
         {[...d.subjects]
           .sort((a, b) => b.priority - a.priority)
           .map((s) => (
             <section key={s.id} className={ui.card}>
               <div className="mb-3 flex flex-wrap items-center gap-2">
-                <h2 className="min-w-0 flex-1 font-semibold">{s.name}</h2>
+                <div className="min-w-0 flex-1">
+                  <h2 className="font-semibold">{s.name}</h2>
+                  {s.course && <p className="text-xs text-muted">{s.course}</p>}
+                </div>
                 <span className="text-xs text-warning" title="গুরুত্ব">{"★".repeat(s.priority)}</span>
                 <span className="text-xs text-muted">
                   {s.topics.length} টপিক · {fmtMinutes(s.topics.reduce((n, t) => n + t.estimatedMinutes, 0))}

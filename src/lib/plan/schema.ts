@@ -20,8 +20,10 @@ export const topicSchema = z.object({
 export const subjectSchema = z.object({
   id: z.string().min(1),
   name: z.string().trim().min(1, "বিষয়ের নাম দিন").max(120),
+  /** Optional course / batch name, e.g. "Complete 40 Lecture Course" */
+  course: z.string().trim().max(200).optional().default(""),
   priority: z.coerce.number().int().min(1).max(5).default(3),
-  topics: z.array(topicSchema).max(200),
+  topics: z.array(topicSchema).max(300),
 });
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "তারিখ সঠিক নয়");
@@ -38,6 +40,8 @@ export const planDataSchema = z.object({
   /** 0 = Sunday … 6 = Saturday */
   studyWeekdays: z.array(z.number().int().min(0).max(6)).min(1, "অন্তত একটি দিন বাছুন").max(7),
   subjects: z.array(subjectSchema).max(30),
+  /** Recurring daily habits, e.g. "প্রতিদিন English Newspaper পড়া" */
+  dailyTargets: z.array(z.string().trim().min(1).max(200)).max(20).optional().default([]),
 });
 
 export type PlanData = z.infer<typeof planDataSchema>;
@@ -64,6 +68,7 @@ export function emptyPlan(): PlanData {
     dailyStudyMinutes: 180,
     studyWeekdays: [0, 1, 2, 3, 4, 5, 6],
     subjects: [],
+    dailyTargets: [],
   };
 }
 

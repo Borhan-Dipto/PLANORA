@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { aiChatTurn, createPlanFromDraft, type ChatMessage } from "@/lib/actions/plans";
 import type { AiDraft } from "@/lib/plan/draft";
 import { ui } from "@/components/ui";
+import { draftToPlan } from "@/lib/plan/draft";
+import { downloadJson } from "@/lib/plan/import";
 
 const GREETING =
   "আসসালামু আলাইকুম! 👋 আমি আপনার ৩০ দিনের স্টাডি প্ল্যান বানাতে সাহায্য করব। শুরুতে বলুন — কোন পরীক্ষার প্রস্তুতি নিচ্ছেন? (যেমন: বিসিএস, ব্যাংক জব, ভর্তি পরীক্ষা, বিশ্ববিদ্যালয়ের সেমিস্টার, HSC…) আর আপনি কি ফুল-টাইম পড়ছেন নাকি চাকরির পাশাপাশি?";
@@ -75,6 +77,14 @@ export function AiChat() {
                 · {draft.subjects.length} বিষয় · {topicCount} টপিক
               </span>
             </p>
+            <button
+              type="button"
+              onClick={() => downloadJson(draftToPlan(draft))}
+              disabled={!draft.subjects.length}
+              className={`${ui.btn} ${ui.ghost} w-full sm:w-auto`}
+            >
+              ⬇ JSON
+            </button>
             <button
               onClick={create}
               disabled={creating || !draft.subjects.length}

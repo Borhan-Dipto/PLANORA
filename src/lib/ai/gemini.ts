@@ -89,12 +89,18 @@ export const draftResponseSchema = {
     goal: { type: "STRING" },
     examDate: { type: "STRING", description: "YYYY-MM-DD, or empty string if unknown" },
     dailyStudyMinutes: { type: "INTEGER", description: "0 if unknown" },
+    dailyTargets: {
+      type: "ARRAY",
+      items: { type: "STRING" },
+      description: "Recurring daily habits, e.g. 'প্রতিদিন English Newspaper পড়া', 'প্রতিদিন ২–৩টি টপিক'",
+    },
     subjects: {
       type: "ARRAY",
       items: {
         type: "OBJECT",
         properties: {
           name: { type: "STRING" },
+          course: { type: "STRING", description: "Course/batch name if any, else empty" },
           priority: { type: "INTEGER", description: "1 (low) to 5 (high)" },
           topics: {
             type: "ARRAY",
@@ -109,11 +115,11 @@ export const draftResponseSchema = {
             },
           },
         },
-        required: ["name", "priority", "topics"],
+        required: ["name", "course", "priority", "topics"],
       },
     },
   },
-  required: ["title", "goal", "examDate", "dailyStudyMinutes", "subjects"],
+  required: ["title", "goal", "examDate", "dailyStudyMinutes", "dailyTargets", "subjects"],
 };
 
 export const chatResponseSchema = {
