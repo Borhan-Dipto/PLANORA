@@ -18,8 +18,15 @@ export async function PageFrame({
   return (
     <AppShell dict={dict} locale={locale}>
       <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-surface/95 px-4 py-3 backdrop-blur">
+        <Link
+          href="/dashboard"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent text-sm font-bold text-accent-foreground md:hidden"
+          aria-label="PLANORA — ড্যাশবোর্ডে যান"
+        >
+          P
+        </Link>
         {back && (
-          <Link href={back} className="text-muted hover:text-foreground" aria-label="ফিরে যান">
+          <Link href={back} className="shrink-0 text-muted hover:text-foreground" aria-label="ফিরে যান">
             ←
           </Link>
         )}

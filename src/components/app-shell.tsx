@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import type { Dictionary } from "@/lib/i18n";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
@@ -14,6 +17,10 @@ const NAV_ITEMS = [
 
 const SETTINGS_ITEM = { href: "/settings", key: "settings" as const, icon: "⚙️" };
 
+function isActive(pathname: string, href: string) {
+  return href === "/dashboard" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
+}
+
 export function AppShell({
   children,
   dict,
@@ -23,33 +30,47 @@ export function AppShell({
   dict: Dictionary;
   locale: "bn" | "en";
 }) {
+  const pathname = usePathname();
+
   return (
     <div className="flex min-h-screen">
       {/* Desktop sidebar */}
-      <aside className="hidden w-56 flex-col border-r border-border bg-surface p-4 md:flex">
-        <Link href="/dashboard" className="mb-6 text-lg font-bold text-accent">
-          PLANORA
+      <aside className="hidden w-60 flex-col border-r border-border bg-surface p-4 md:flex">
+        <Link href="/dashboard" className="mb-6 flex items-center gap-2 px-1" aria-label="PLANORA — ড্যাশবোর্ডে যান">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent text-sm font-bold text-accent-foreground">
+            P
+          </span>
+          <span className="font-brand text-lg font-bold tracking-tight text-foreground">PLANORA</span>
         </Link>
-        <nav className="flex flex-1 flex-col gap-1">
-          {NAV_ITEMS.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="rounded-md px-3 py-2 text-sm text-muted hover:bg-background hover:text-foreground"
-            >
-              <span className="mr-2">{item.icon}</span>
-              {dict.nav[item.key]}
-            </Link>
-          ))}
+        <nav className="flex flex-1 flex-col gap-0.5">
+          {NAV_ITEMS.map((item) => {
+            const active = isActive(pathname, item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+                className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium ${
+                  active ? "bg-accent/10 text-accent" : "text-muted hover:bg-background hover:text-foreground"
+                }`}
+              >
+                <span className="text-base leading-none">{item.icon}</span>
+                {dict.nav[item.key]}
+              </Link>
+            );
+          })}
           <Link
             href={SETTINGS_ITEM.href}
-            className="rounded-md px-3 py-2 text-sm text-muted hover:bg-background hover:text-foreground"
+            aria-current={isActive(pathname, SETTINGS_ITEM.href) ? "page" : undefined}
+            className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium ${
+              isActive(pathname, SETTINGS_ITEM.href) ? "bg-accent/10 text-accent" : "text-muted hover:bg-background hover:text-foreground"
+            }`}
           >
-            <span className="mr-2">{SETTINGS_ITEM.icon}</span>
+            <span className="text-base leading-none">{SETTINGS_ITEM.icon}</span>
             {dict.nav.settings}
           </Link>
         </nav>
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 border-t border-border pt-3">
           <ThemeToggle />
           <LanguageToggle locale={locale} />
         </div>
@@ -60,19 +81,23 @@ export function AppShell({
 
         {/* Mobile bottom nav — grid (not flex) so every item, including Settings, always has its own slot and never gets clipped */}
         <nav
-          className="fixed inset-x-0 bottom-0 z-20 grid border-t border-border bg-surface py-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))] md:hidden"
+          className="fixed inset-x-0 bottom-0 z-20 grid border-t border-border bg-surface/95 py-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))] backdrop-blur md:hidden"
           style={{ gridTemplateColumns: `repeat(${NAV_ITEMS.length + 1}, minmax(0, 1fr))` }}
         >
-          {[...NAV_ITEMS, SETTINGS_ITEM].map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="flex min-w-0 flex-col items-center gap-0.5 px-0.5 text-muted"
-            >
-              <span className="text-base leading-none">{item.icon}</span>
-              <span className="w-full truncate text-center text-[10px] leading-tight">{dict.nav[item.key]}</span>
-            </Link>
-          ))}
+          {[...NAV_ITEMS, SETTINGS_ITEM].map((item) => {
+            const active = isActive(pathname, item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+                className={`flex min-w-0 flex-col items-center gap-0.5 px-0.5 ${active ? "text-accent" : "text-muted"}`}
+              >
+                <span className="text-base leading-none">{item.icon}</span>
+                <span className="w-full truncate text-center text-[10px] leading-tight font-medium">{dict.nav[item.key]}</span>
+              </Link>
+            );
+          })}
         </nav>
       </div>
     </div>

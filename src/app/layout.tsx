@@ -1,5 +1,16 @@
 import type { Metadata, Viewport } from "next";
 import { ThemeProvider } from "@/components/theme-provider";
+// Self-hosted (via @fontsource, no Google Fonts network fetch at build/runtime). Hind Siliguri is a
+// clean, modern Bengali + Latin face used for all app copy — carries most of the "premium" feel
+// since nearly every screen is Bangla text. Space Grotesk is Latin-only, for the PLANORA wordmark.
+import "@fontsource/hind-siliguri/300.css";
+import "@fontsource/hind-siliguri/400.css";
+import "@fontsource/hind-siliguri/500.css";
+import "@fontsource/hind-siliguri/600.css";
+import "@fontsource/hind-siliguri/700.css";
+import "@fontsource/space-grotesk/500.css";
+import "@fontsource/space-grotesk/600.css";
+import "@fontsource/space-grotesk/700.css";
 import "./globals.css";
 
 export const metadata: Metadata = {

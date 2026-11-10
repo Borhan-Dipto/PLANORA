@@ -142,9 +142,12 @@ export default async function DashboardPage() {
 
   return (
     <AppShell dict={dict} locale={locale}>
-      <header className="flex items-center justify-between border-b border-border p-4">
-        <Link href="/dashboard" className="font-semibold text-accent">
-          PLANORA
+      <header className="flex items-center justify-between border-b border-border bg-surface/95 p-4 backdrop-blur md:hidden">
+        <Link href="/dashboard" className="flex items-center gap-2" aria-label="PLANORA — ড্যাশবোর্ডে যান">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent text-sm font-bold text-accent-foreground">
+            P
+          </span>
+          <span className="font-brand text-base font-bold tracking-tight">PLANORA</span>
         </Link>
         <form action={signOut}>
           <button className="rounded-md border border-border px-3 py-1.5 text-sm text-muted hover:text-foreground">
@@ -153,7 +156,14 @@ export default async function DashboardPage() {
         </form>
       </header>
       <main className="mx-auto w-full max-w-3xl p-4 sm:p-6">
-        <h1 className="text-xl font-semibold">{dict.dashboard.question}</h1>
+        <div className="hidden items-center justify-end md:flex">
+          <form action={signOut}>
+            <button className="rounded-md border border-border px-3 py-1.5 text-sm text-muted hover:text-foreground">
+              {dict.auth.logout}
+            </button>
+          </form>
+        </div>
+        <h1 className="mt-2 text-xl font-semibold md:mt-0">{dict.dashboard.question}</h1>
         <p className="mt-1 text-sm text-muted">
           {dict.dashboard.greeting}, {profile?.displayName ?? profile?.email}
         </p>
