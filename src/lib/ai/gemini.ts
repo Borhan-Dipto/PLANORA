@@ -5,7 +5,7 @@ export type GeminiContent = { role: "user" | "model"; parts: Part[] };
 
 export class AiError extends Error {}
 
-const DEFAULT_MODELS = "gemini-3.8-flash,gemini-flash-latest";
+const DEFAULT_MODELS = "gemini-flash-lite-latest,gemini-3.5-flash-lite,gemini-flash-latest";
 
 /** Calls Gemini with structured JSON output. Returns parsed JSON + token usage. */
 export async function generateJson({
