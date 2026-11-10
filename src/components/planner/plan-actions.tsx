@@ -42,6 +42,9 @@ export function PlanActions({
             >
               ✓ অনুমোদন দিন ও শুরু করুন
             </button>
+            <Link href={`/planner/${id}/schedule`} className={`${ui.btn} ${ui.secondary}`}>
+              📅 দিনভিত্তিক শিডিউল দেখুন
+            </Link>
             <Link href={`/planner/${id}/edit`} className={`${ui.btn} ${ui.secondary}`}>
               ✎ এডিট
             </Link>
