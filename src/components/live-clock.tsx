@@ -13,7 +13,7 @@ export function LiveClock({ className = "" }: { className?: string }) {
   const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
-    setNow(new Date());
+    // First tick lands within 1s of mount — no synchronous setState in the effect body itself.
     const id = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(id);
   }, []);

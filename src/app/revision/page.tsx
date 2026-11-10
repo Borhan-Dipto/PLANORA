@@ -4,7 +4,7 @@ import { db } from "@/db/client";
 import { planTasks } from "@/db/schema";
 import { requireUserId } from "@/lib/session";
 import { getActivePlan, todayFor } from "@/lib/schedule/service";
-import { cycleEnd, learningEnd } from "@/lib/schedule/engine";
+import { learningEnd } from "@/lib/schedule/engine";
 import { PageFrame } from "@/components/page-frame";
 import { TaskList, type TaskItem } from "@/components/schedule/task-list";
 import { ui, WEEKDAY_LABEL } from "@/components/ui";
@@ -28,7 +28,6 @@ export default async function RevisionPage() {
 
   const plan = active.planData;
   const lEnd = learningEnd(plan);
-  const cEnd = cycleEnd(plan);
 
   if (today <= lEnd) {
     return (

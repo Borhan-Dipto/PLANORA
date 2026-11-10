@@ -1,0 +1,17 @@
+{
+  "name": "PLANORA — আমার কাছে একটা রিয়েল প্ল্যান আছে",
+  "short_name": "PLANORA",
+  "description": "AI-Powered Study Planning & Productivity Platform",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0B0D10",
+  "theme_color": "#2563EB",
+  "orientation": "portrait",
+  "lang": "bn",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

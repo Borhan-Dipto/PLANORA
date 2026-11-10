@@ -1,7 +1,7 @@
 "use client";
 
 import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
+import { useMounted } from "@/lib/use-mounted";
 
 const OPTIONS = [
   { value: "light", label: "☀️" },
@@ -12,8 +12,7 @@ const OPTIONS = [
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
   // Avoid hydration mismatch: render nothing meaningful until mounted.
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const mounted = useMounted();
 
   return (
     <div className="inline-flex rounded-lg border border-border bg-surface p-0.5">

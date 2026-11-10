@@ -47,7 +47,9 @@ function fmtClock(totalSeconds: number) {
 
 export function FocusScreen({ session }: { session: ActiveSession }) {
   const router = useRouter();
-  const startedAt = useRef(new Date(session.startedAtIso).getTime()).current;
+  // Lazy initializer runs once and the value is never reassigned — stable across re-renders
+  // without touching a ref during render (which React now flags).
+  const [startedAt] = useState(() => new Date(session.startedAtIso).getTime());
   const [elapsedSec, setElapsedSec] = useState(() => Math.max(0, Math.round((Date.now() - startedAt) / 1000)));
   const [distractions, setDistractions] = useState(session.distractionCount);
   const [exitOpen, setExitOpen] = useState(false);
