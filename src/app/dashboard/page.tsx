@@ -168,9 +168,12 @@ async function TomorrowPreview({ planId, date }: { planId: string; date: string 
   if (!tasks.length) return null;
   return (
     <section className={ui.card}>
-      <h2 className="mb-3 text-sm font-semibold text-muted">
-        আগামীকাল · {fmtMinutes(tasks.reduce((n, t) => n + t.minutes, 0))}
-      </h2>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-muted">আগামীকাল · {fmtMinutes(tasks.reduce((n, t) => n + t.minutes, 0))}</h2>
+        <Link href="/planner/day" className="shrink-0 text-xs text-accent">
+          ✎ এডিট করুন
+        </Link>
+      </div>
       <div className="space-y-3">
         {groupBySubject(tasks).map((g) => (
           <div key={g.name}>
