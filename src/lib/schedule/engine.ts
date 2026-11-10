@@ -75,73 +75,57 @@ export function buildSchedule(
     }))
     .filter((q) => q.topics.length);
 
-  const total = queues.reduce((n, q) => n + q.topics.reduce((m, t) => m + t.left, 0), 0);
-
-  // Weighted fair interleave: the subject that has received the least time relative to its priority goes next.
-  const order: { q: (typeof queues)[number]; t: (typeof queues)[number]["topics"][number] }[] = [];
-  for (;;) {
-    const live = queues.filter((q) => q.topics.length);
-    if (!live.length) break;
-    live.sort((a, b) => a.vt - b.vt || b.weight - a.weight || a.idx - b.idx);
-    const q = live[0];
-    const t = q.topics.shift()!;
-    q.vt += t.left / q.weight;
-    order.push({ q, t });
-  }
-
   const tasks: NewTask[] = [];
-  let day = 0;
-  let used = 0;
+  const byTopic = new Map<string, NewTask[]>();
   let sort = 0;
-  let placed = 0;
   let maxDay = 0;
   const dayTotals = new Map<string, number>();
-  // Cumulative "ideal" minutes that should be done by the end of day d — keeps the error from piling up.
-  const ideal = (d: number) => (total * (d + 1)) / days.length;
 
-  if (days.length) {
-    for (const { q, t } of order) {
-      let left = t.left;
-      const chunks: NewTask[] = [];
-      while (left > 0) {
-        const last = day >= days.length - 1;
-        const need = ideal(day) - placed; // what today still needs
-        let chunk: number;
-        if (last) chunk = left;
-        else if (used === 0) chunk = left <= Math.max(need, 30) * 1.5 ? left : round5(Math.max(need, 30)); // split big topics
-        else if (placed + left / 2 <= ideal(day)) chunk = left > need + 60 && need >= 30 ? round5(need) : left;
-        else {
-          day++;
-          used = 0;
-          continue;
-        }
-        const date = days[Math.min(day, days.length - 1)];
-        chunks.push({
-          date,
-          kind: "study",
-          subjectId: q.id,
-          topicId: t.id,
-          subjectName: q.name,
-          title: t.partial ? `${t.name} (বাকি অংশ)` : t.name,
-          minutes: chunk,
-          part: chunks.length + 1,
-          parts: 1,
-          sort: sort++,
-        });
-        left -= chunk;
-        placed += chunk;
-        used += chunk;
-        dayTotals.set(date, (dayTotals.get(date) ?? 0) + chunk);
-        maxDay = Math.max(maxDay, dayTotals.get(date)!);
-        if (placed >= ideal(day) && !last) {
-          day++;
-          used = 0;
-        }
-      }
-      chunks.forEach((c) => (c.parts = chunks.length));
-      tasks.push(...chunks);
+  const pushChunk = (q: (typeof queues)[number], t: (typeof queues)[number]["topics"][number], date: string, minutes: number) => {
+    const task: NewTask = {
+      date,
+      kind: "study",
+      subjectId: q.id,
+      topicId: t.id,
+      subjectName: q.name,
+      title: t.partial ? `${t.name} (বাকি অংশ)` : t.name,
+      minutes,
+      part: 1,
+      parts: 1,
+      sort: sort++,
+    };
+    tasks.push(task);
+    const bucket = byTopic.get(t.id) ?? [];
+    bucket.push(task);
+    byTopic.set(t.id, bucket);
+    dayTotals.set(date, (dayTotals.get(date) ?? 0) + minutes);
+    maxDay = Math.max(maxDay, dayTotals.get(date)!);
+  };
+
+  // Day-by-day weighted-fair round robin: within each day, repeatedly hand the next slice to
+  // whichever live subject has received the least time relative to its priority, so a day mixes
+  // several subjects instead of one big topic exclusively occupying consecutive days.
+  for (let day = 0; day < days.length; day++) {
+    const date = days[day];
+    const last = day === days.length - 1;
+    let budget = plan.dailyStudyMinutes;
+    for (;;) {
+      const live = queues.filter((q) => q.topics.length);
+      if (!live.length) break;
+      if (!last && budget <= 0) break;
+      live.sort((a, b) => a.vt - b.vt || b.weight - a.weight || a.idx - b.idx);
+      const q = live[0];
+      const t = q.topics[0];
+      const share = round5(Math.max(30, budget / live.length));
+      const bite = last ? t.left : Math.min(t.left, share);
+      pushChunk(q, t, date, bite);
+      t.left -= bite;
+      q.vt += bite / q.weight;
+      if (!last) budget -= bite;
+      if (t.left <= 0) q.topics.shift();
     }
   }
+  for (const bucket of byTopic.values()) bucket.forEach((c, i) => ((c.part = i + 1), (c.parts = bucket.length)));
 
   // Daily habits on every study day of the whole cycle (learning + revision).
   const targets = (plan.dailyTargets ?? []).filter(Boolean);
