@@ -1,6 +1,7 @@
 "use client";
 
 import { useOptimistic, useTransition } from "react";
+import Link from "next/link";
 import { setTaskDone } from "@/lib/actions/schedule";
 import { fmtMinutes } from "@/components/ui";
 
@@ -15,7 +16,8 @@ export type TaskItem = {
   status: "pending" | "done" | "skipped";
 };
 
-export function TaskList({ tasks, readOnly = false }: { tasks: TaskItem[]; readOnly?: boolean }) {
+/** showFocusStart: only true for today's own list — past/future days and read-only views don't get it. */
+export function TaskList({ tasks, readOnly = false, showFocusStart = false }: { tasks: TaskItem[]; readOnly?: boolean; showFocusStart?: boolean }) {
   const [, start] = useTransition();
   const [items, setOptimistic] = useOptimistic(tasks, (cur, { id, done }: { id: string; done: boolean }) =>
     cur.map((t) => (t.id === id ? { ...t, status: done ? "done" : "pending" } as TaskItem : t))
@@ -34,14 +36,15 @@ export function TaskList({ tasks, readOnly = false }: { tasks: TaskItem[]; readO
     <ul className="space-y-2">
       {items.map((t) => {
         const done = t.status === "done";
+        const canFocus = showFocusStart && !readOnly && t.kind === "study" && !done;
         return (
-          <li key={t.id}>
+          <li key={t.id} className="flex items-stretch gap-2">
             <button
               type="button"
               onClick={() => toggle(t)}
               disabled={readOnly}
               aria-pressed={done}
-              className={`flex w-full items-start gap-3 rounded-lg border p-3 text-left transition ${
+              className={`flex min-w-0 flex-1 items-start gap-3 rounded-lg border p-3 text-left transition ${
                 done ? "border-success/30 bg-success/5" : "border-border bg-surface hover:border-accent"
               } ${readOnly ? "cursor-default" : ""}`}
             >
@@ -62,6 +65,15 @@ export function TaskList({ tasks, readOnly = false }: { tasks: TaskItem[]; readO
               </span>
               {t.minutes > 0 && <span className="shrink-0 text-xs text-muted">{fmtMinutes(t.minutes)}</span>}
             </button>
+            {canFocus && (
+              <Link
+                href={`/focus/${t.id}`}
+                className="flex shrink-0 items-center rounded-lg bg-accent px-3 text-sm font-medium text-accent-foreground"
+                aria-label="ফোকাস মোডে শুরু করুন"
+              >
+                ▶
+              </Link>
+            )}
           </li>
         );
       })}

@@ -10,6 +10,7 @@ import { getActivePlan, missedCount, tasksForDates, todayFor } from "@/lib/sched
 import { cycleEnd, learningEnd } from "@/lib/schedule/engine";
 import { addDays } from "@/lib/plan/schema";
 import { TaskList } from "@/components/schedule/task-list";
+import { getActiveFocusSession } from "@/lib/actions/focus";
 import { RescheduleBanner } from "@/components/schedule/reschedule-button";
 import { LiveTimeBudget } from "@/components/schedule/live-time-budget";
 import { LiveClock } from "@/components/live-clock";
@@ -24,12 +25,13 @@ function dayNumber(start: string, today: string) {
 export default async function DashboardPage() {
   const userId = await requireUserId();
   const today = await todayFor(userId);
-  const [[profile], [prefs], dict, locale, active] = await Promise.all([
+  const [[profile], [prefs], dict, locale, active, focusSession] = await Promise.all([
     db.select().from(profiles).where(eq(profiles.id, userId)),
     db.select().from(userPreferences).where(eq(userPreferences.userId, userId)),
     getDictionary(),
     getLocale(),
     getActivePlan(userId, today),
+    getActiveFocusSession(),
   ]);
 
   let body: React.ReactNode;
@@ -86,6 +88,19 @@ export default async function DashboardPage() {
           </p>
         </Link>
 
+        {focusSession && (
+          <Link
+            href="/focus"
+            className="flex items-center gap-3 rounded-xl border border-accent/40 bg-accent/10 p-4 hover:border-accent"
+          >
+            <span className="text-2xl">▶</span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-medium">ফোকাস মোড চলছে: {focusSession.title}</span>
+              <span className="block text-xs text-muted">ফিরে গিয়ে চালিয়ে যান — সময় গণনা চলছেই</span>
+            </span>
+          </Link>
+        )}
+
         <RescheduleBanner planId={active.id} missed={missed} />
 
         {!notStarted && todayMin > 0 && (
@@ -103,7 +118,7 @@ export default async function DashboardPage() {
           ) : isRevision && !study.length ? (
             <p className="text-sm text-muted">🔁 আজ রিভিশনের দিন — আগের কঠিন টপিকগুলো আবার দেখে নিন।</p>
           ) : tasks.length ? (
-            <TaskList tasks={tasks} />
+            <TaskList tasks={tasks} showFocusStart />
           ) : (
             <p className="text-sm text-muted">আজ কোনো পড়া নির্ধারিত নেই — বিশ্রাম নিন 🌿</p>
           )}
