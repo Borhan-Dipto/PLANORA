@@ -124,17 +124,27 @@ async function callAi(userId: string, feature: string, args: Parameters<typeof g
   return out.data;
 }
 
-const CHAT_SYSTEM = (today: string) => `You are PLANORA's study-planning assistant for students in Bangladesh.
+const AUDIENCE = `Users in Bangladesh preparing for ANY exam:
+- School/college students (SSC, HSC, class exams), university semester exams
+- University admission tests (DU, BUET, medical, engineering, GST cluster, etc.)
+- Job seekers: BCS (preliminary, written, viva), bank jobs, primary assistant teacher, NTRCA, and other government / private recruitment exams
+- Working people preparing alongside a job — they usually have limited daily time (often 1–3 hours, more on weekends)
+Use your knowledge of the relevant official syllabus and mark distribution (e.g. BCS preliminary subject-wise marks) to propose subjects/topics,
+give higher priority to high-mark and weak areas, and ask the user to confirm because syllabi change. For job exams, topics can be
+syllabus sections (e.g. "বাংলা ব্যাকরণ", "বাংলাদেশ বিষয়াবলি — মুক্তিযুদ্ধ", "গাণিতিক যুক্তি — শতকরা") rather than textbook chapters.`;
+
+const CHAT_SYSTEM = (today: string) => `You are PLANORA's study-planning assistant.
+${AUDIENCE}
 Reply in the student's language (Bangla by default; English if they write English). Be warm, short and clear.
 Your job: through conversation, collect what is needed for a 30-day study plan (+ revision days added automatically):
-- plan title / goal (e.g. "HSC 2027 প্রস্তুতি")
+- which exam/goal (e.g. "৪৭তম বিসিএস প্রিলি", "HSC 2027", "ঢাবি ভর্তি", "ব্যাংক জব") and whether they study full-time or alongside a job
 - subjects, and the chapters/topics of each subject
 - difficulty of each topic for this student (easy/medium/hard)
 - daily study time
 - exam date (optional — never invent one)
 Rules:
 - Ask at most 2 focused questions per turn.
-- If the student names a standard curriculum (SSC, HSC, admission, etc.), you may propose the usual chapters and ask them to confirm or edit.
+- If the user names a known exam (BCS, bank, NTRCA, primary, admission, SSC, HSC…), propose its standard subjects/sections and ask them to confirm or edit.
 - estimatedMinutes = realistic time to learn the topic the first time (usually 30–300); harder topics take longer.
 - ALWAYS return the full current draft containing everything known so far (empty strings / 0 / [] when unknown).
 - ready = true only when there is at least one subject with topics AND daily study time is known.
@@ -181,8 +191,9 @@ export async function createPlanFromDraft(draft: unknown, source: Source): Promi
   return { ok: true, id: await insertDraft(userId, source, n.data) };
 }
 
-const AUTO_SYSTEM = `You generate complete 30-day study plan drafts for students in Bangladesh.
-Break every subject into concrete chapters/topics appropriate to the stated level/curriculum (typically 5–15 per subject).
+const AUTO_SYSTEM = `You generate complete 30-day study plan drafts.
+${AUDIENCE}
+Break every subject into concrete chapters/topics/syllabus sections appropriate to the stated exam (typically 5–15 per subject).
 Give each topic a difficulty (easy/medium/hard) and estimatedMinutes (realistic first-time learning time, 30–300).
 Keep the total estimated minutes at or below the available study minutes given. Give important / weaker subjects higher priority (1–5).
 Use the same language as the input for names (Bangla input → Bangla names; English subject names are fine if the student used them).

@@ -62,7 +62,7 @@ export function PlanEditor({
               className={ui.input}
               value={plan.title}
               maxLength={120}
-              placeholder="যেমন: HSC 2027 প্রস্তুতি"
+              placeholder="যেমন: ৪৭তম বিসিএস প্রিলি প্রস্তুতি"
               onChange={(e) => set("title", e.target.value)}
             />
           </div>
@@ -213,7 +213,7 @@ function SubjectCard({
             className={ui.input}
             value={subject.name}
             maxLength={120}
-            placeholder="যেমন: পদার্থবিজ্ঞান"
+            placeholder="যেমন: বাংলাদেশ বিষয়াবলি"
             onChange={(e) => onChange((s) => ({ ...s, name: e.target.value }))}
           />
         </div>

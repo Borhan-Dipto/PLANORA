@@ -7,6 +7,8 @@ import { ui } from "@/components/ui";
 
 export function AutoPlannerForm() {
   const router = useRouter();
+  const EXAMS = ["বিসিএস প্রিলিমিনারি", "বিসিএস লিখিত", "ব্যাংক জব", "প্রাইমারি শিক্ষক", "NTRCA", "বিশ্ববিদ্যালয় ভর্তি", "মেডিকেল ভর্তি", "HSC", "SSC"];
+
   const [f, setF] = useState({ goal: "", subjects: "", examDate: "", hours: 3, notes: "" });
   const [error, setError] = useState("");
   const [pending, start] = useTransition();
@@ -30,23 +32,35 @@ export function AutoPlannerForm() {
   return (
     <form onSubmit={submit} className={`${ui.card} space-y-4`}>
       <div>
-        <label className={ui.label}>কীসের জন্য পড়ছেন?</label>
+        <label className={ui.label}>কোন পরীক্ষার প্রস্তুতি?</label>
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {EXAMS.map((x) => (
+            <button
+              key={x}
+              type="button"
+              onClick={() => setF({ ...f, goal: x })}
+              className={`rounded-full border px-3 py-1 text-xs ${f.goal === x ? "border-accent bg-accent text-accent-foreground" : "border-border text-muted hover:text-foreground"}`}
+            >
+              {x}
+            </button>
+          ))}
+        </div>
         <input
           className={ui.input}
           value={f.goal}
           maxLength={300}
-          placeholder="যেমন: HSC 2027, বিজ্ঞান বিভাগ"
+          placeholder="অথবা নিজে লিখুন: ৪৭তম বিসিএস, সোনালী ব্যাংক অফিসার, HSC 2027 বিজ্ঞান…"
           onChange={(e) => setF({ ...f, goal: e.target.value })}
         />
       </div>
       <div>
-        <label className={ui.label}>বিষয়সমূহ *</label>
+        <label className={ui.label}>বিষয়সমূহ * <span className="font-normal">(বিসিএস/চাকরির পরীক্ষায় “সিলেবাস অনুযায়ী” লিখলে AI নিজেই সাজিয়ে দেবে)</span></label>
         <textarea
           className={`${ui.input} min-h-24`}
           value={f.subjects}
           maxLength={1500}
           required
-          placeholder="কমা বা লাইন দিয়ে আলাদা করুন: পদার্থবিজ্ঞান, রসায়ন, উচ্চতর গণিত"
+          placeholder="যেমন: বাংলা, ইংরেজি, গণিত, বাংলাদেশ বিষয়াবলি — অথবা “পুরো সিলেবাস অনুযায়ী”"
           onChange={(e) => setF({ ...f, subjects: e.target.value })}
         />
       </div>
@@ -75,7 +89,7 @@ export function AutoPlannerForm() {
           className={`${ui.input} min-h-20`}
           value={f.notes}
           maxLength={1000}
-          placeholder="যেমন: জৈব রসায়নে দুর্বল, গণিতে বেশি সময় দরকার"
+          placeholder="যেমন: চাকরির পাশাপাশি পড়ি, ইংরেজি গ্রামারে দুর্বল, গণিতে বেশি সময় দরকার"
           onChange={(e) => setF({ ...f, notes: e.target.value })}
         />
       </div>
