@@ -23,6 +23,8 @@ export const subjectSchema = z.object({
   /** Optional course / batch name, e.g. "Complete 40 Lecture Course" */
   course: z.string().trim().max(200).optional().default(""),
   priority: z.coerce.number().int().min(1).max(5).default(3),
+  /** 0 = Sunday … 6 = Saturday. Empty ⇒ every one of the plan's own study days ("প্রতিদিন"). */
+  weekdays: z.array(z.number().int().min(0).max(6)).max(7).optional().default([]),
   topics: z.array(topicSchema).max(300),
 });
 
@@ -83,6 +85,9 @@ export function analyzePlan(plan: PlanData): { issues: PlanIssue[]; stats: PlanS
   if (plan.subjects.length === 0) issues.push({ level: "error", message: "কোনো বিষয় যোগ করা হয়নি" });
   for (const s of plan.subjects) {
     if (s.topics.length === 0) issues.push({ level: "error", message: `"${s.name}" বিষয়ে কোনো টপিক নেই` });
+    if (s.weekdays.length && !s.weekdays.some((w) => plan.studyWeekdays.includes(w))) {
+      issues.push({ level: "warning", message: `"${s.name}"-এর বাছাই করা দিনগুলো প্ল্যানের পড়ার দিনের সাথে মিলছে না` });
+    }
   }
   if (plan.examDate && plan.examDate < plan.startDate) {
     issues.push({ level: "error", message: "পরীক্ষার তারিখ শুরুর তারিখের আগে" });

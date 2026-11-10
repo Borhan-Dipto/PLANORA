@@ -65,6 +65,8 @@ export function buildSchedule(
       id: s.id,
       name: s.name,
       weight: Math.max(1, s.priority),
+      /** 0-6, empty = every study day ("প্রতিদিন"). */
+      weekdays: s.weekdays ?? [],
       vt: 0,
       topics: s.topics
         .map((t) => {
@@ -108,9 +110,12 @@ export function buildSchedule(
   for (let day = 0; day < days.length; day++) {
     const date = days[day];
     const last = day === days.length - 1;
+    const weekday = new Date(date + "T00:00:00Z").getUTCDay();
     let budget = plan.dailyStudyMinutes;
     for (;;) {
-      const live = queues.filter((q) => q.topics.length);
+      // A subject with its own chosen weekdays only shows up on those days — except on the very
+      // last day, which must absorb every subject's remaining topics so nothing is left unscheduled.
+      const live = queues.filter((q) => q.topics.length && (last || !q.weekdays.length || q.weekdays.includes(weekday)));
       if (!live.length) break;
       if (!last && budget <= 0) break;
       live.sort((a, b) => a.vt - b.vt || b.weight - a.weight || a.idx - b.idx);

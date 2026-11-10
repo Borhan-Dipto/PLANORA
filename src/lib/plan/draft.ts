@@ -52,6 +52,7 @@ export function draftToPlan(d: AiDraft): PlanData {
       name: s.name.trim().slice(0, 120),
       course: s.course.trim().slice(0, 200),
       priority: clamp(s.priority, 1, 5),
+      weekdays: [] as number[],
       topics: s.topics
         .filter((t) => t.name.trim())
         .slice(0, 300)

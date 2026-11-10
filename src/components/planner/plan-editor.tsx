@@ -42,7 +42,10 @@ export function PlanEditor({
     setPlan((p) => ({ ...p, subjects: p.subjects.map((s) => (s.id === id ? fn(s) : s)) }));
 
   const addSubject = () =>
-    setPlan((p) => ({ ...p, subjects: [...p.subjects, { id: newId(), name: "", course: "", priority: 3, topics: [] }] }));
+    setPlan((p) => ({
+      ...p,
+      subjects: [...p.subjects, { id: newId(), name: "", course: "", priority: 3, weekdays: [], topics: [] }],
+    }));
 
   const save = () =>
     start(async () => {
@@ -278,6 +281,46 @@ function SubjectCard({
         <button type="button" onClick={onRemove} className={`${ui.btn} ${ui.danger} px-3`} aria-label="বিষয় মুছুন">
           ✕
         </button>
+      </div>
+
+      <div className="mt-3">
+        <label className={ui.label}>কোন কোন দিন পড়বেন</label>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            aria-pressed={subject.weekdays.length === 0}
+            onClick={() => onChange((s) => ({ ...s, weekdays: [] }))}
+            className={`rounded-lg border px-3 py-1.5 text-sm ${
+              subject.weekdays.length === 0 ? "border-accent bg-accent text-accent-foreground" : "border-border text-muted"
+            }`}
+          >
+            প্রতিদিন
+          </button>
+          {WEEKDAY_LABEL.map((d, i) => {
+            const on = subject.weekdays.includes(i);
+            return (
+              <button
+                key={i}
+                type="button"
+                aria-pressed={on}
+                onClick={() =>
+                  onChange((s) => ({
+                    ...s,
+                    weekdays: on ? s.weekdays.filter((x) => x !== i) : [...s.weekdays, i].sort(),
+                  }))
+                }
+                className={`min-w-12 rounded-lg border px-3 py-1.5 text-sm ${
+                  on ? "border-accent bg-accent text-accent-foreground" : "border-border text-muted"
+                }`}
+              >
+                {d}
+              </button>
+            );
+          })}
+        </div>
+        {subject.weekdays.length > 0 && (
+          <p className="mt-1 text-xs text-muted">সপ্তাহে {subject.weekdays.length} দিন — বাকি দিনগুলোয় এই বিষয়টা আসবে না</p>
+        )}
       </div>
 
       <div className="mt-4 space-y-2">
