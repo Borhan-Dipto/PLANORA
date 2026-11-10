@@ -15,10 +15,10 @@ function VerifyForm() {
       <input type="hidden" name="email" value={email} />
       <input
         name="token"
-        inputMode="numeric"
-        maxLength={6}
+        inputMode="text"
+        maxLength={8}
         required
-        placeholder="123456"
+        placeholder="কোড পেস্ট করুন"
         className="w-full rounded border px-3 py-2 text-center text-lg tracking-widest"
       />
       {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
