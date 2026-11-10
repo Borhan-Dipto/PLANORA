@@ -1,9 +1,13 @@
+import { eq } from "drizzle-orm";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { db } from "@/db/client";
+import { userPreferences } from "@/db/schema";
 import { getDictionary, getLocale } from "@/lib/i18n";
 import { AppShell } from "@/components/app-shell";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
+import { SleepScheduleForm } from "@/components/sleep-schedule-form";
 
 export const instant = false;
 
@@ -12,8 +16,11 @@ export default async function SettingsPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const dict = await getDictionary();
-  const locale = await getLocale();
+  const [dict, locale, [prefs]] = await Promise.all([
+    getDictionary(),
+    getLocale(),
+    db.select().from(userPreferences).where(eq(userPreferences.userId, user.id)),
+  ]);
 
   return (
     <AppShell dict={dict} locale={locale}>
@@ -29,6 +36,7 @@ export default async function SettingsPage() {
           <span>{dict.settings.language}</span>
           <LanguageToggle locale={locale} />
         </div>
+        <SleepScheduleForm wakeTime={prefs?.wakeTime ?? null} sleepTime={prefs?.sleepTime ?? null} />
       </main>
     </AppShell>
   );

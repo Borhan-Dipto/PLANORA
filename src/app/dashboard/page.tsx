@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { profiles, planTasks } from "@/db/schema";
+import { profiles, planTasks, userPreferences } from "@/db/schema";
 import { signOut } from "@/lib/actions/auth";
 import { requireUserId } from "@/lib/session";
 import { getDictionary, getLocale } from "@/lib/i18n";
@@ -11,6 +11,7 @@ import { cycleEnd, learningEnd } from "@/lib/schedule/engine";
 import { addDays } from "@/lib/plan/schema";
 import { TaskList } from "@/components/schedule/task-list";
 import { RescheduleBanner } from "@/components/schedule/reschedule-button";
+import { LiveTimeBudget } from "@/components/schedule/live-time-budget";
 import { ui, fmtMinutes } from "@/components/ui";
 
 export const instant = false;
@@ -22,8 +23,9 @@ function dayNumber(start: string, today: string) {
 export default async function DashboardPage() {
   const userId = await requireUserId();
   const today = await todayFor(userId);
-  const [[profile], dict, locale, active] = await Promise.all([
+  const [[profile], [prefs], dict, locale, active] = await Promise.all([
     db.select().from(profiles).where(eq(profiles.id, userId)),
+    db.select().from(userPreferences).where(eq(userPreferences.userId, userId)),
     getDictionary(),
     getLocale(),
     getActivePlan(userId, today),
@@ -81,35 +83,12 @@ export default async function DashboardPage() {
 
         <RescheduleBanner planId={active.id} missed={missed} />
 
-        {todayMin > 0 && (
-          <section className={ui.card}>
-            <h2 className="mb-4 font-semibold">আজ আপনার পড়ার হিসাব</h2>
-            <div className="grid grid-cols-3 divide-x divide-border text-center">
-              <div className="px-1">
-                <p className="text-2xl font-bold">{fmtMinutes(todayMin)}</p>
-                <p className="mt-1 text-xs leading-tight text-muted">আজ মোট পড়তে হবে</p>
-              </div>
-              <div className="px-1">
-                <p className="text-2xl font-bold text-success">{fmtMinutes(todayDone)}</p>
-                <p className="mt-1 text-xs leading-tight text-muted">এখন পর্যন্ত পড়া শেষ</p>
-              </div>
-              <div className="px-1">
-                <p className="text-2xl font-bold text-accent">{fmtMinutes(Math.max(0, todayMin - todayDone))}</p>
-                <p className="mt-1 text-xs leading-tight text-muted">আজ আর বাকি আছে</p>
-              </div>
-            </div>
-            <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-background">
-              <div
-                className="h-full rounded-full bg-success transition-all"
-                style={{ width: `${todayMin ? Math.min(100, Math.round((todayDone / todayMin) * 100)) : 0}%` }}
-              />
-            </div>
-            <p className="mt-2 text-center text-xs text-muted">
-              {todayDone >= todayMin
-                ? "🎉 আজকের পড়া সম্পন্ন! অসাধারণ কাজ করেছেন।"
-                : `আজকের লক্ষ্যের ${Math.round((todayDone / todayMin) * 100)}% শেষ হয়েছে`}
-            </p>
-          </section>
+        {!notStarted && todayMin > 0 && (
+          <LiveTimeBudget
+            wakeTime={prefs?.wakeTime ?? null}
+            sleepTime={prefs?.sleepTime ?? null}
+            studyRemainingMinutes={todayMin - todayDone}
+          />
         )}
 
         <section className={ui.card}>

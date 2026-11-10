@@ -26,6 +26,8 @@ export const userPreferences = pgTable("user_preferences", {
   theme: text("theme").notNull().default("system"), // "light" | "dark" | "system"
   notificationsEnabled: boolean("notifications_enabled").notNull().default(true),
   dailyReminderEnabled: boolean("daily_reminder_enabled").notNull().default(true),
+  wakeTime: text("wake_time"), // "HH:mm", null = not set yet
+  sleepTime: text("sleep_time"), // "HH:mm", null = not set yet
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
