@@ -8,6 +8,33 @@ const RING_R = 120;
 const RING_C = 2 * Math.PI * RING_R;
 const EXIT_REASONS = ["জরুরি প্রয়োজন", "ব্যাটারি/নেটওয়ার্ক সমস্যা", "শরীর খারাপ লাগছে", "অন্য কারণ"];
 
+// Milestones are checked against progress (0→1). Each fires once, in order, with a short
+// toast + haptic pulse — a small "variable reward" nudge (goal-gradient effect: people push
+// harder as a visible goal gets closer) without ever breaking the countdown's focus.
+const MILESTONES = [
+  { at: 0.25, text: "ভালো শুরু — গতি ধরে রাখুন 🔥" },
+  { at: 0.5, text: "অর্ধেক শেষ! এগিয়ে যান 💪" },
+  { at: 0.75, text: "প্রায় শেষের পথে — থামবেন না 🚀" },
+  { at: 0.9, text: "একদম কাছাকাছি! শেষ টুকু শেষ করুন 🏁" },
+];
+// Rotated below the ring so staring at a static screen doesn't itself become a distraction —
+// brief, varied, non-intrusive cues keep attention anchored on the task (not on checking the phone).
+const AFFIRMATIONS = [
+  "এক নিঃশ্বাসে মনোযোগ ফিরিয়ে আনুন।",
+  "শুধু এই মুহূর্তটুকু পড়ুন — বাকিটা পরে।",
+  "ছোট ছোট অগ্রগতিই বড় ফলাফল গড়ে।",
+  "আপনার লক্ষ্য আপনার থেকে বেশি দূরে নেই।",
+  "মনোযোগ একটা পেশি — এখন সেটাই গড়ছেন।",
+];
+
+function vibrate(pattern: number | number[]) {
+  try {
+    navigator.vibrate?.(pattern);
+  } catch {
+    /* unsupported — ignore */
+  }
+}
+
 function fmtClock(totalSeconds: number) {
   const s = Math.max(0, Math.round(totalSeconds));
   const h = Math.floor(s / 3600);
@@ -29,6 +56,10 @@ export function FocusScreen({ session }: { session: ActiveSession }) {
   const [done, setDone] = useState<{ actualMinutes: number; targetMinutes: number } | null>(null);
   const [, start] = useTransition();
   const wasHidden = useRef(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const milestoneIdx = useRef(0);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [affirmIdx, setAffirmIdx] = useState(0);
 
   // The ticking display is purely cosmetic — re-syncs to the server's startedAt every render,
   // so a wrong device clock can't be used to fast-forward or rewind the timer.
@@ -85,6 +116,27 @@ export function FocusScreen({ session }: { session: ActiveSession }) {
     };
   }, []);
 
+  // Rotate a short affirmation every 40s — enough variety to stay fresh, slow enough to never distract.
+  useEffect(() => {
+    const id = setInterval(() => setAffirmIdx((i) => (i + 1) % AFFIRMATIONS.length), 40_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const targetSecForMilestones = session.targetMinutes * 60;
+  useEffect(() => {
+    if (targetSecForMilestones <= 0) return;
+    const p = elapsedSec / targetSecForMilestones;
+    const next = MILESTONES[milestoneIdx.current];
+    if (next && p >= next.at) {
+      milestoneIdx.current += 1;
+      vibrate(next.at >= 0.9 ? [40, 60, 40] : 30);
+      setToast(next.text);
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+      toastTimer.current = setTimeout(() => setToast(null), 3600);
+    }
+  }, [elapsedSec, targetSecForMilestones]);
+  useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
+
   const finish = useCallback(() => {
     start(async () => {
       const res = await completeFocusSession(session.id);
@@ -124,10 +176,20 @@ export function FocusScreen({ session }: { session: ActiveSession }) {
   const targetSec = session.targetMinutes * 60;
   const progress = targetSec > 0 ? elapsedSec / targetSec : 0;
   const overTime = progress >= 1;
+  const remainingSec = Math.max(0, targetSec - elapsedSec);
+  const overSec = Math.max(0, elapsedSec - targetSec);
   const tone = overTime ? "error" : progress >= 0.75 ? "warning" : "success";
   const strokeClass = { success: "stroke-accent", warning: "stroke-warning", error: "stroke-error" }[tone];
   const textClass = { success: "text-white", warning: "text-warning", error: "text-error" }[tone];
-  const dashOffset = RING_C * (1 - Math.min(1, progress));
+  const glowClass = { success: "bg-accent/25", warning: "bg-warning/25", error: "bg-error/30" }[tone];
+  const clippedProgress = Math.min(1, progress);
+  const dashOffset = RING_C * (1 - clippedProgress);
+  // Dot marks the live tip of the ring. The whole <svg> is rotated -90°, so a point placed at
+  // angle 2π·progress (clockwise from 3 o'clock, SVG's default) lands exactly on the filled edge
+  // after rotation — i.e. starting at 12 o'clock, same as the stroke itself.
+  const dotAngle = 2 * Math.PI * clippedProgress;
+  const dotX = 130 + RING_R * Math.cos(dotAngle);
+  const dotY = 130 + RING_R * Math.sin(dotAngle);
 
   return (
     <FocusShell>
@@ -136,7 +198,10 @@ export function FocusScreen({ session }: { session: ActiveSession }) {
         <h1 className="mb-6 line-clamp-2 px-4 text-lg font-semibold text-white">{session.title}</h1>
 
         <div className="relative flex h-64 w-64 items-center justify-center">
-          <svg viewBox="0 0 260 260" className="h-64 w-64 -rotate-90">
+          {/* Ambient "breathing" glow behind the ring — a quiet sign the screen is alive, not static. */}
+          <div className={`absolute h-48 w-48 rounded-full ${glowClass} blur-3xl transition-colors duration-1000`} style={{ animation: "focus-breathe 4s ease-in-out infinite" }} />
+
+          <svg viewBox="0 0 260 260" className="relative h-64 w-64 -rotate-90">
             <circle cx="130" cy="130" r={RING_R} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="10" />
             <circle
               cx="130"
@@ -149,29 +214,62 @@ export function FocusScreen({ session }: { session: ActiveSession }) {
               strokeDasharray={RING_C}
               strokeDashoffset={dashOffset}
             />
+            {!overTime && (
+              <circle cx={dotX} cy={dotY} r="7" className={strokeClass} style={{ fill: "currentColor" }}>
+                <animate attributeName="r" values="6;8;6" dur="1.6s" repeatCount="indefinite" />
+              </circle>
+            )}
           </svg>
+
           <div className="absolute flex flex-col items-center">
-            <span className={`font-mono text-4xl font-bold tabular-nums ${textClass}`}>{fmtClock(elapsedSec)}</span>
-            <span className="mt-1 text-xs text-slate-500">লক্ষ্য {session.targetMinutes} মিনিট</span>
-            {overTime && <span className="mt-1 text-xs text-error">+{fmtClock(elapsedSec - targetSec)} অতিরিক্ত</span>}
+            <span className={`font-mono text-5xl font-bold tabular-nums transition-colors duration-500 ${textClass}`}>
+              {overTime ? `+${fmtClock(overSec)}` : fmtClock(remainingSec)}
+            </span>
+            <span className="mt-1 text-xs text-slate-500">
+              {overTime ? "অতিরিক্ত সময় — লক্ষ্য পার হয়েছে" : `বাকি আছে · লক্ষ্য ${session.targetMinutes} মিনিট`}
+            </span>
           </div>
+
+          {/* Milestone toast — a brief, non-blocking nudge, not a dialog that breaks flow. */}
+          {toast && (
+            <div
+              key={toast}
+              className="absolute -top-3 left-1/2 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-full border border-white/10 bg-white/10 px-4 py-1.5 text-xs font-medium text-white backdrop-blur-sm"
+              style={{ animation: "focus-toast-in 0.3s ease-out" }}
+            >
+              {toast}
+            </div>
+          )}
         </div>
 
+        <p className="mt-6 min-h-[1.25rem] text-sm text-slate-400 transition-opacity duration-500">{AFFIRMATIONS[affirmIdx]}</p>
+
         {distractions > 0 && (
-          <p className="mt-6 text-xs text-slate-500">আপনি {distractions} বার ফোকাস থেকে সরে গিয়েছিলেন — সময় তবু চলছিলই।</p>
+          <p className="mt-3 text-xs text-slate-500">আপনি {distractions} বার ফোকাস থেকে সরে গিয়েছিলেন — সময় তবু চলছিলই।</p>
         )}
 
-        <p className="mt-8 max-w-xs text-sm text-slate-500">এখানে পজ করার কোনো অপশন নেই। সময় গণনা চলতেই থাকবে, যতক্ষণ না আপনি শেষ করেন।</p>
+        <p className="mt-6 max-w-xs text-xs text-slate-600">এখানে পজ করার কোনো অপশন নেই। সময় গণনা চলতেই থাকবে, যতক্ষণ না আপনি শেষ করেন।</p>
 
         <div className="mt-8 flex w-full flex-col gap-3">
-          <button onClick={finish} className="rounded-full bg-success px-6 py-3.5 font-semibold text-white">
+          <button
+            onClick={finish}
+            className="rounded-full bg-success px-6 py-3.5 font-semibold text-white transition-transform active:scale-95"
+          >
             ✓ পড়া শেষ করেছি
           </button>
-          <button onClick={() => setExitOpen(true)} className="rounded-full border border-slate-700 px-6 py-3 text-sm text-slate-400">
+          <button
+            onClick={() => setExitOpen(true)}
+            className="rounded-full border border-slate-700 px-6 py-3 text-sm text-slate-400 transition-transform active:scale-95"
+          >
             🚨 জরুরি অবস্থায় বের হোন
           </button>
         </div>
       </div>
+
+      <style>{`
+        @keyframes focus-breathe { 0%,100% { transform: scale(0.92); opacity: 0.55; } 50% { transform: scale(1.06); opacity: 0.9; } }
+        @keyframes focus-toast-in { from { opacity: 0; transform: translate(-50%, -80%); } to { opacity: 1; transform: translate(-50%, -100%); } }
+      `}</style>
 
       {exitOpen && (
         <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/80 p-4">
