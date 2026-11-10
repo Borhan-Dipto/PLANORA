@@ -113,6 +113,13 @@ export function FocusScreen({ session }: { session: ActiveSession }) {
 
   useEffect(() => {
     document.documentElement.requestFullscreen?.().catch(() => {});
+    // The PWA manifest no longer locks orientation, but some browsers still carry a stale lock
+    // from an earlier install — explicitly unlock so rotating the phone works in fullscreen too.
+    try {
+      (screen.orientation as ScreenOrientation & { unlock?: () => void })?.unlock?.();
+    } catch {
+      /* unsupported — ignore */
+    }
     return () => {
       if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
     };
@@ -195,15 +202,41 @@ export function FocusScreen({ session }: { session: ActiveSession }) {
 
   return (
     <FocusShell>
-      <div className="flex w-full max-w-sm flex-col items-center gap-1 text-center">
-        {session.subjectName && <p className="text-sm font-medium text-slate-400">{session.subjectName}</p>}
-        <h1 className="mb-6 line-clamp-2 px-4 text-lg font-semibold text-white">{session.title}</h1>
+      <div className="flex w-full max-w-sm flex-col items-center gap-1 text-center landscape:max-w-3xl landscape:flex-row landscape:justify-center landscape:gap-10 landscape:text-left">
+        <div className="landscape:order-2 landscape:flex-1">
+          {session.subjectName && <p className="text-sm font-medium text-slate-400">{session.subjectName}</p>}
+          <h1 className="mb-6 line-clamp-2 px-4 text-lg font-semibold text-white landscape:px-0 landscape:mb-4">{session.title}</h1>
 
-        <div className="relative flex h-64 w-64 items-center justify-center">
+          <p className="min-h-[1.25rem] text-sm text-slate-400 transition-opacity duration-500 landscape:text-left">{AFFIRMATIONS[affirmIdx]}</p>
+
+          {distractions > 0 && (
+            <p className="mt-3 text-xs text-slate-500">আপনি {distractions} বার ফোকাস থেকে সরে গিয়েছিলেন — সময় তবু চলছিলই।</p>
+          )}
+
+          <p className="mt-6 max-w-xs text-xs text-slate-600 landscape:max-w-none">এখানে পজ করার কোনো অপশন নেই। সময় গণনা চলতেই থাকবে, যতক্ষণ না আপনি শেষ করেন।</p>
+
+          <div className="mt-8 flex w-full flex-col gap-3 landscape:max-w-xs">
+            <button
+              onClick={finish}
+              className="rounded-full bg-success px-6 py-3.5 font-semibold text-white transition-transform active:scale-95"
+            >
+              ✓ পড়া শেষ করেছি
+            </button>
+            <button
+              onClick={() => setExitOpen(true)}
+              className="rounded-full border border-slate-700 px-6 py-3 text-sm text-slate-400 transition-transform active:scale-95"
+            >
+              🚨 জরুরি অবস্থায় বের হোন
+            </button>
+          </div>
+        </div>
+
+        {/* Ring + time — the main highlight, enlarged whenever the phone is in landscape. */}
+        <div className="relative flex h-64 w-64 shrink-0 items-center justify-center landscape:order-1 landscape:h-72 landscape:w-72">
           {/* Ambient "breathing" glow behind the ring — a quiet sign the screen is alive, not static. */}
-          <div className={`absolute h-48 w-48 rounded-full ${glowClass} blur-3xl transition-colors duration-1000`} style={{ animation: "focus-breathe 4s ease-in-out infinite" }} />
+          <div className={`absolute h-48 w-48 rounded-full ${glowClass} blur-3xl transition-colors duration-1000 landscape:h-56 landscape:w-56`} style={{ animation: "focus-breathe 4s ease-in-out infinite" }} />
 
-          <svg viewBox="0 0 260 260" className="relative h-64 w-64 -rotate-90">
+          <svg viewBox="0 0 260 260" className="relative h-64 w-64 -rotate-90 landscape:h-72 landscape:w-72">
             <circle cx="130" cy="130" r={RING_R} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="10" />
             <circle
               cx="130"
@@ -224,10 +257,10 @@ export function FocusScreen({ session }: { session: ActiveSession }) {
           </svg>
 
           <div className="absolute flex flex-col items-center">
-            <span className={`font-mono text-5xl font-bold tabular-nums transition-colors duration-500 ${textClass}`}>
+            <span className={`font-mono text-5xl font-bold tabular-nums transition-colors duration-500 ${textClass} landscape:text-6xl`}>
               {overTime ? `+${fmtClock(overSec)}` : fmtClock(remainingSec)}
             </span>
-            <span className="mt-1 text-xs text-slate-500">
+            <span className="mt-1 text-xs text-slate-500 landscape:text-sm">
               {overTime ? "অতিরিক্ত সময় — লক্ষ্য পার হয়েছে" : `বাকি আছে · লক্ষ্য ${session.targetMinutes} মিনিট`}
             </span>
           </div>
@@ -242,29 +275,6 @@ export function FocusScreen({ session }: { session: ActiveSession }) {
               {toast}
             </div>
           )}
-        </div>
-
-        <p className="mt-6 min-h-[1.25rem] text-sm text-slate-400 transition-opacity duration-500">{AFFIRMATIONS[affirmIdx]}</p>
-
-        {distractions > 0 && (
-          <p className="mt-3 text-xs text-slate-500">আপনি {distractions} বার ফোকাস থেকে সরে গিয়েছিলেন — সময় তবু চলছিলই।</p>
-        )}
-
-        <p className="mt-6 max-w-xs text-xs text-slate-600">এখানে পজ করার কোনো অপশন নেই। সময় গণনা চলতেই থাকবে, যতক্ষণ না আপনি শেষ করেন।</p>
-
-        <div className="mt-8 flex w-full flex-col gap-3">
-          <button
-            onClick={finish}
-            className="rounded-full bg-success px-6 py-3.5 font-semibold text-white transition-transform active:scale-95"
-          >
-            ✓ পড়া শেষ করেছি
-          </button>
-          <button
-            onClick={() => setExitOpen(true)}
-            className="rounded-full border border-slate-700 px-6 py-3 text-sm text-slate-400 transition-transform active:scale-95"
-          >
-            🚨 জরুরি অবস্থায় বের হোন
-          </button>
         </div>
       </div>
 
