@@ -12,6 +12,7 @@ import { addDays } from "@/lib/plan/schema";
 import { TaskList } from "@/components/schedule/task-list";
 import { RescheduleBanner } from "@/components/schedule/reschedule-button";
 import { LiveTimeBudget } from "@/components/schedule/live-time-budget";
+import { LiveClock } from "@/components/live-clock";
 import { ui, fmtMinutes } from "@/components/ui";
 
 export const instant = false;
@@ -34,12 +35,15 @@ export default async function DashboardPage() {
   let body: React.ReactNode;
   if (!active) {
     body = (
-      <div className={`${ui.card} mt-6 text-center text-muted`}>
-        <p>{dict.dashboard.noPlan}</p>
-        <p className="mt-1 text-sm">{dict.dashboard.noPlanHint}</p>
-        <Link href="/planner" className={`${ui.btn} ${ui.primary} mt-4`}>
-          প্ল্যান বানান
-        </Link>
+      <div className="mt-6 space-y-4">
+        <LiveClock className={ui.card} />
+        <div className={`${ui.card} text-center text-muted`}>
+          <p>{dict.dashboard.noPlan}</p>
+          <p className="mt-1 text-sm">{dict.dashboard.noPlanHint}</p>
+          <Link href="/planner" className={`${ui.btn} ${ui.primary} mt-4`}>
+            প্ল্যান বানান
+          </Link>
+        </div>
       </div>
     );
   } else {
@@ -66,6 +70,7 @@ export default async function DashboardPage() {
 
     body = (
       <div className="mt-6 space-y-4">
+        <LiveClock className={ui.card} />
         <Link href={`/planner/${active.id}`} className={`${ui.card} block hover:border-accent`}>
           <div className="flex flex-wrap items-center gap-2">
             <p className="min-w-0 flex-1 truncate font-semibold">{active.title}</p>

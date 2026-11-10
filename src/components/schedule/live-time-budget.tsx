@@ -96,7 +96,13 @@ export function LiveTimeBudget({
 
   return (
     <section className={ui.card}>
-      <h2 className="font-semibold">আজকের সময় বাজেট (লাইভ)</h2>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="font-semibold">আজকের সময় বাজেট (লাইভ)</h2>
+        <p className="font-mono text-sm tabular-nums text-muted">
+          🕐{" "}
+          {now.toLocaleTimeString("bn-BD", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true })}
+        </p>
+      </div>
       <div className="mt-4 grid grid-cols-2 gap-3 text-center">
         <div>
           <p className={`font-mono text-2xl font-bold tabular-nums ${noTimeLeft ? "text-error" : ""}`}>
