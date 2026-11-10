@@ -21,19 +21,37 @@ export async function generateJson({
   const model = process.env.AI_PROVIDER_MODEL || "gemini-flash-latest";
   if (!key) throw new AiError("AI কনফিগার করা নেই");
 
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-    {
+  const call = (thinking: boolean) =>
+    fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": key },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: system }] },
         contents,
-        generationConfig: { temperature, responseMimeType: "application/json", responseSchema },
+        generationConfig: {
+          temperature,
+          responseMimeType: "application/json",
+          responseSchema,
+          // Structured planning output doesn't need long "thinking" — it made calls time out.
+          ...(thinking ? {} : { thinkingConfig: { thinkingBudget: 0 } }),
+        },
       }),
-      signal: AbortSignal.timeout(55_000),
+      signal: AbortSignal.timeout(100_000),
+    });
+
+  const started = Date.now();
+  let res: Response;
+  try {
+    res = await call(false);
+    if (res.status === 400) {
+      const body = await res.clone().text();
+      if (/thinking/i.test(body)) res = await call(true); // model doesn't accept a zero budget
     }
-  );
+  } catch (e) {
+    console.error("Gemini fetch failed", model, Date.now() - started, "ms", e);
+    if (e instanceof Error && e.name === "TimeoutError") throw new AiError("AI উত্তর দিতে বেশি সময় নিচ্ছে, আবার চেষ্টা করুন");
+    throw new AiError("AI-এর সাথে যোগাযোগ করা যায়নি, আবার চেষ্টা করুন");
+  }
 
   if (!res.ok) {
     const body = await res.text();
@@ -43,6 +61,7 @@ export async function generateJson({
   }
 
   const json = await res.json();
+  console.info("Gemini ok", json?.modelVersion ?? model, Date.now() - started, "ms");
   const text: string | undefined = json?.candidates?.[0]?.content?.parts
     ?.map((p: Part) => p.text ?? "")
     .join("");
