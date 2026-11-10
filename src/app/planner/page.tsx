@@ -11,7 +11,7 @@ export const instant = false;
 const OPTIONS = [
   { href: "/planner/new/ai", icon: "💬", title: "AI চ্যাট", desc: "কথা বলে বলে AI-এর সাথে প্ল্যান বানান" },
   { href: "/planner/new/auto", icon: "✨", title: "অটোমেটিক", desc: "বিষয় দিন, AI পুরো প্ল্যান বানিয়ে দেবে" },
-  { href: "/planner/new/manual", icon: "✍️", title: "ম্যানুয়াল", desc: "নিজের হাতে বিষয় ও টপিক সাজান" },
+  { href: "/planner/new/manual", icon: "✍️", title: "ম্যানুয়াল", desc: "নিজের হাতে সাজান, অথবা ChatGPT/Claude-এর JSON ইমপোর্ট করুন" },
 ];
 
 const STATUS_TONE = {

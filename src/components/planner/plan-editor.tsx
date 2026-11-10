@@ -14,6 +14,7 @@ import {
 } from "@/lib/plan/schema";
 import { ui, DIFFICULTY_LABEL, WEEKDAY_LABEL, fmtMinutes } from "@/components/ui";
 import { PlanStatsBar, IssueList } from "@/components/planner/plan-summary";
+import { JsonImport } from "@/components/planner/json-import";
 
 type Source = "manual" | "ai_chat" | "automatic";
 
@@ -52,6 +53,8 @@ export function PlanEditor({
 
   return (
     <div className="space-y-4 pb-24">
+      <JsonImport onImport={(imported) => setPlan((p) => ({ ...imported, revisionDays: p.revisionDays }))} />
+
       {/* Plan settings */}
       <section className={ui.card}>
         <h2 className="mb-4 font-semibold">প্ল্যানের তথ্য</h2>
