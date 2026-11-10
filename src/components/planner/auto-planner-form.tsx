@@ -7,7 +7,7 @@ import { ui } from "@/components/ui";
 
 export function AutoPlannerForm() {
   const router = useRouter();
-  const EXAMS = ["বিসিএস প্রিলিমিনারি", "বিসিএস লিখিত", "ব্যাংক জব", "প্রাইমারি শিক্ষক", "NTRCA", "বিশ্ববিদ্যালয় ভর্তি", "মেডিকেল ভর্তি", "HSC", "SSC"];
+  const EXAMS = ["বিসিএস প্রিলিমিনারি", "বিসিএস লিখিত", "ব্যাংক জব", "প্রাইমারি শিক্ষক", "NTRCA", "বিশ্ববিদ্যালয় সেমিস্টার", "বিশ্ববিদ্যালয় ভর্তি", "মেডিকেল ভর্তি", "HSC", "SSC"];
 
   const [f, setF] = useState({ goal: "", subjects: "", examDate: "", hours: 3, notes: "" });
   const [error, setError] = useState("");

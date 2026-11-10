@@ -125,7 +125,10 @@ async function callAi(userId: string, feature: string, args: Parameters<typeof g
 }
 
 const AUDIENCE = `Users in Bangladesh preparing for ANY exam:
-- School/college students (SSC, HSC, class exams), university semester exams
+- School/college students (SSC, HSC, class exams)
+- University students (public/private/National University, engineering, medical, etc.): semester midterm/final exams,
+  where "subjects" are their courses (course code + title, e.g. "CSE 2101 — Data Structures") and topics are the course outline/lectures;
+  also thesis, lab and skill goals (IELTS, GRE, programming) if they ask
 - University admission tests (DU, BUET, medical, engineering, GST cluster, etc.)
 - Job seekers: BCS (preliminary, written, viva), bank jobs, primary assistant teacher, NTRCA, and other government / private recruitment exams
 - Working people preparing alongside a job — they usually have limited daily time (often 1–3 hours, more on weekends)
