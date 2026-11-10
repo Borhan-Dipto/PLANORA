@@ -68,6 +68,7 @@ export function DayPlanner({
       .map(([id, m]) => ({ topicId: id, minutes: m }))
   );
   const [query, setQuery] = useState("");
+  const [showSearch, setShowSearch] = useState(() => !Object.values(initialMinutes).some((m) => m > 0));
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<{ type: "ok" | "error"; text: string } | null>(null);
   const router = useRouter();
@@ -119,39 +120,15 @@ export function DayPlanner({
         <h2 className="font-semibold">{dateLabel}</h2>
         {locked && <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs text-accent">🔒 ম্যানুয়াল</span>}
       </div>
-      <p className="mt-1 text-xs text-muted">টপিক খুঁজে যোগ করুন, তারপর ঠিক কত মিনিট দেবেন তা বসান।</p>
+      <p className="mt-1 text-xs text-muted">
+        {picks.length
+          ? "অটোমেটিক সিস্টেম এই টপিকগুলো ঠিক করে রেখেছে — আজকের ক্লাস রুটিন অনুযায়ী মিনিট বদলে নিন।"
+          : "এই দিনের জন্য অটোমেটিক সিস্টেম এখনো কিছু ঠিক করেনি — নিচে থেকে টপিক খুঁজে যোগ করুন।"}
+      </p>
 
-      <div className="relative mt-4">
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="টপিক বা বিষয়ের নাম লিখে খুঁজুন…"
-          className={ui.input}
-        />
-        {results.length > 0 && (
-          <div className="absolute z-10 mt-1 w-full divide-y divide-border rounded-lg border border-border bg-surface shadow-lg">
-            {results.map((f) => (
-              <button
-                key={f.topicId}
-                type="button"
-                onClick={() => addPick(f.topicId)}
-                className="flex w-full items-center gap-2 p-2.5 text-left text-sm hover:bg-background"
-              >
-                <span className="min-w-0 flex-1 truncate">{f.topicName}</span>
-                <span className="shrink-0 text-xs text-muted">
-                  {f.subjectName} · {DIFFICULTY_LABEL[f.difficulty]} · {fmtMinutes(f.remaining)} বাকি
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="mt-4 space-y-2">
-        {picks.length === 0 ? (
-          <p className="text-sm text-muted">এখনো কোনো টপিক বাছা হয়নি — উপরে খুঁজে যোগ করুন।</p>
-        ) : (
-          picks.map((p) => {
+      {picks.length > 0 && (
+        <div className="mt-4 space-y-2">
+          {picks.map((p) => {
             const f = byTopicId.get(p.topicId);
             if (!f) return null;
             return (
@@ -182,9 +159,45 @@ export function DayPlanner({
                 </button>
               </div>
             );
-          })
-        )}
-      </div>
+          })}
+        </div>
+      )}
+
+      {!showSearch ? (
+        <button type="button" onClick={() => setShowSearch(true)} className="mt-3 text-sm text-accent">
+          + আরেকটা টপিক যোগ করুন
+        </button>
+      ) : (
+        <div className="relative mt-3">
+          <input
+            autoFocus={picks.length > 0}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="টপিক বা বিষয়ের নাম লিখে খুঁজুন…"
+            className={ui.input}
+          />
+          {results.length > 0 && (
+            <div className="absolute z-10 mt-1 w-full divide-y divide-border rounded-lg border border-border bg-surface shadow-lg">
+              {results.map((f) => (
+                <button
+                  key={f.topicId}
+                  type="button"
+                  onClick={() => {
+                    addPick(f.topicId);
+                    setShowSearch(false);
+                  }}
+                  className="flex w-full items-center gap-2 p-2.5 text-left text-sm hover:bg-background"
+                >
+                  <span className="min-w-0 flex-1 truncate">{f.topicName}</span>
+                  <span className="shrink-0 text-xs text-muted">
+                    {f.subjectName} · {DIFFICULTY_LABEL[f.difficulty]} · {fmtMinutes(f.remaining)} বাকি
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <p className="mt-3 text-xs text-muted">
         মোট: {fmtMinutes(total)}
