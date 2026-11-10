@@ -71,15 +71,17 @@ export function DayPlanner({
         {subjects.map((s) => (
           <div key={s.id} className="flex items-center gap-3">
             <span className="min-w-0 flex-1 truncate text-sm">{s.name}</span>
-            <input
-              type="number"
-              min={0}
-              step={5}
-              inputMode="numeric"
-              value={minutes[s.id] ?? 0}
-              onChange={(e) => setMinutes((m) => ({ ...m, [s.id]: Math.max(0, Number(e.target.value) || 0) }))}
-              className={`${ui.input} w-24 text-right`}
-            />
+            <div className="w-20 shrink-0">
+              <input
+                type="number"
+                min={0}
+                step={5}
+                inputMode="numeric"
+                value={minutes[s.id] ?? 0}
+                onChange={(e) => setMinutes((m) => ({ ...m, [s.id]: Math.max(0, Number(e.target.value) || 0) }))}
+                className={`${ui.input} text-right`}
+              />
+            </div>
             <span className="shrink-0 text-xs text-muted">মি.</span>
           </div>
         ))}

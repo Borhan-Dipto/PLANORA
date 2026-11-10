@@ -81,6 +81,7 @@ export default async function DayPlannerPage({ searchParams }: { searchParams: P
         </p>
 
         <DayPlanner
+          key={date}
           planId={active.id}
           date={date}
           dateLabel={dateLabel}
