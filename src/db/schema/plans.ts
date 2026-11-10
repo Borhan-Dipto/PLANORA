@@ -24,7 +24,7 @@ export const plans = pgTable(
   (t) => [index("plans_user_status_idx").on(t.userId, t.status)]
 );
 
-/** One row per AI call — used for daily quotas (Phase 7 will tie limits to subscription). */
+/** One row per AI call — used for daily quotas, tiered by subscription (see lib/plan/tier.ts). */
 export const aiUsageLogs = pgTable(
   "ai_usage_logs",
   {

@@ -1,7 +1,6 @@
 import { eq } from "drizzle-orm";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
+import { requireUserId } from "@/lib/session";
 import { db } from "@/db/client";
 import { userPreferences, profiles } from "@/db/schema";
 import { getDictionary, getLocale } from "@/lib/i18n";
@@ -11,15 +10,13 @@ import { LanguageToggle } from "@/components/language-toggle";
 import { SleepScheduleForm } from "@/components/sleep-schedule-form";
 
 export default async function SettingsPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const userId = await requireUserId();
 
   const [dict, locale, [prefs], [profile]] = await Promise.all([
     getDictionary(),
     getLocale(),
-    db.select().from(userPreferences).where(eq(userPreferences.userId, user.id)),
-    db.select({ role: profiles.role }).from(profiles).where(eq(profiles.id, user.id)),
+    db.select().from(userPreferences).where(eq(userPreferences.userId, userId)),
+    db.select({ role: profiles.role }).from(profiles).where(eq(profiles.id, userId)),
   ]);
   const isAdmin = profile?.role === "admin" || profile?.role === "super_admin";
 

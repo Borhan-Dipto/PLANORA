@@ -1,12 +1,9 @@
-import { createClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
+import { requireUserId } from "@/lib/session";
 import { getDictionary, getLocale } from "@/lib/i18n";
 import { AppShell } from "@/components/app-shell";
 
 export async function ComingSoonPage({ title, phase }: { title: string; phase: string }) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  await requireUserId();
 
   const dict = await getDictionary();
   const locale = await getLocale();

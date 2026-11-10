@@ -13,7 +13,7 @@
     "greeting": "Welcome",
     "question": "What should I study today?",
     "noPlan": "No plan yet.",
-    "noPlanHint": "The Planner arrives in Phase 3."
+    "noPlanHint": "Click the button below to create your first plan."
   },
   "auth": {
     "emailPrompt": "Enter your email, we'll send you a code.",
