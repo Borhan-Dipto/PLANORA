@@ -28,8 +28,7 @@ export async function generateJson({
   // Request variants, tried in order on HTTP 400 — models differ in which structured-output options they accept.
   type Variant = "schema" | "jsonSchema" | "plain";
   const variants: { v: Variant; thinkingOff: boolean }[] = [
-    { v: "schema", thinkingOff: true },
-    { v: "schema", thinkingOff: false },
+    { v: "schema", thinkingOff: false }, // thinkingBudget:0 is rejected by current Gemini models (400)
     { v: "jsonSchema", thinkingOff: false },
     { v: "plain", thinkingOff: false },
   ];
