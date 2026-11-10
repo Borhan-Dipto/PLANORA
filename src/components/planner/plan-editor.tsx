@@ -40,7 +40,7 @@ export function PlanEditor({
     setPlan((p) => ({ ...p, subjects: p.subjects.map((s) => (s.id === id ? fn(s) : s)) }));
 
   const addSubject = () =>
-    setPlan((p) => ({ ...p, subjects: [...p.subjects, { id: newId(), name: "", priority: 3, topics: [] }] }));
+    setPlan((p) => ({ ...p, subjects: [...p.subjects, { id: newId(), name: "", course: "", priority: 3, topics: [] }] }));
 
   const save = () =>
     start(async () => {
