@@ -8,16 +8,20 @@ import { ui } from "@/components/ui";
 
 export function PlanActions({
   id,
+  title,
   status,
   canApprove,
 }: {
   id: string;
+  title: string;
   status: "draft" | "active" | "completed" | "archived";
   canApprove: boolean;
 }) {
   const router = useRouter();
   const [error, setError] = useState("");
-  const [confirm, setConfirm] = useState<null | "delete" | "archive">(null);
+  const [confirm, setConfirm] = useState<null | "archive">(null);
+  const [showDelete, setShowDelete] = useState(false);
+  const [typed, setTyped] = useState("");
   const [pending, start] = useTransition();
 
   const run = (fn: () => Promise<{ ok: boolean; error?: string; id?: string }>, after?: (id?: string) => void) =>
@@ -48,19 +52,6 @@ export function PlanActions({
             <Link href={`/planner/${id}/edit`} className={`${ui.btn} ${ui.secondary}`}>
               ✎ এডিট
             </Link>
-            {confirm === "delete" ? (
-              <button
-                disabled={pending}
-                onClick={() => run(() => deletePlan(id), () => router.push("/planner"))}
-                className={`${ui.btn} ${ui.danger}`}
-              >
-                নিশ্চিত, মুছুন
-              </button>
-            ) : (
-              <button onClick={() => setConfirm("delete")} className={`${ui.btn} ${ui.danger}`}>
-                মুছুন
-              </button>
-            )}
           </>
         )}
         {status === "active" && (
@@ -99,6 +90,54 @@ export function PlanActions({
         )}
       </div>
       {error && <p className="text-sm text-error">{error}</p>}
+
+      <div className="rounded-lg border border-error/30 p-3">
+        {!showDelete ? (
+          <button
+            type="button"
+            onClick={() => setShowDelete(true)}
+            className="text-sm text-error hover:underline"
+          >
+            🗑️ পুরো প্ল্যান একদম মুছে ফেলুন
+          </button>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-sm text-error">
+              এটা স্থায়ীভাবে মুছে যাবে — এই প্ল্যানের সব বিষয়, টপিক, শিডিউল ও অগ্রগতি একদম হারিয়ে যাবে, আর ফেরত আনা যাবে না।
+            </p>
+            <p className="text-xs text-muted">
+              নিশ্চিত করতে নিচে প্ল্যানের নামটা হুবহু লিখুন: <span className="font-semibold text-foreground">{title}</span>
+            </p>
+            <input
+              autoFocus
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              placeholder={title}
+              className={ui.input}
+            />
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={pending || typed !== title}
+                onClick={() => run(() => deletePlan(id), () => router.push("/planner"))}
+                className={`${ui.btn} ${ui.danger}`}
+              >
+                স্থায়ীভাবে মুছে ফেলুন
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDelete(false);
+                  setTyped("");
+                }}
+                className={`${ui.btn} ${ui.secondary}`}
+              >
+                বাতিল
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

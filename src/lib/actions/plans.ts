@@ -104,10 +104,17 @@ export async function archivePlan(planId: string): Promise<Result> {
   return { ok: true };
 }
 
+/** Permanently deletes a plan of any status — the user confirmed by retyping its title. Cascades
+ * to its tasks and focus sessions. */
 export async function deletePlan(planId: string): Promise<Result> {
   const userId = await requireUserId();
-  await db.delete(plans).where(and(eq(plans.id, planId), eq(plans.userId, userId), eq(plans.status, "draft")));
+  const deleted = await db
+    .delete(plans)
+    .where(and(eq(plans.id, planId), eq(plans.userId, userId)))
+    .returning({ id: plans.id });
+  if (!deleted.length) return { ok: false, error: "প্ল্যানটি পাওয়া যায়নি" };
   revalidatePath("/planner");
+  revalidatePath("/dashboard");
   return { ok: true };
 }
 

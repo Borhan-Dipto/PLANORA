@@ -56,7 +56,7 @@ export default async function PlanPreviewPage({ params }: PageProps<"/planner/[i
         <IssueList issues={issues} />
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
           <div className="flex-1">
-            <PlanActions id={plan.id} status={plan.status} canApprove={canApprove} />
+            <PlanActions id={plan.id} title={plan.title} status={plan.status} canApprove={canApprove} />
           </div>
           <DownloadJsonButton plan={d} />
         </div>
