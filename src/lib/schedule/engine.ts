@@ -75,7 +75,8 @@ export function buildSchedule(
         })
         .filter((t) => t.left > 0),
     }))
-    .filter((q) => q.topics.length);
+    .filter((q) => q.topics.length)
+    .map((q) => ({ ...q, total: q.topics.reduce((n, t) => n + t.left, 0) }));
 
   const tasks: NewTask[] = [];
   const byTopic = new Map<string, NewTask[]>();
@@ -84,6 +85,15 @@ export function buildSchedule(
   const dayTotals = new Map<string, number>();
 
   const pushChunk = (q: (typeof queues)[number], t: (typeof queues)[number]["topics"][number], date: string, minutes: number) => {
+    dayTotals.set(date, (dayTotals.get(date) ?? 0) + minutes);
+    maxDay = Math.max(maxDay, dayTotals.get(date)!);
+    // Same topic served twice in one day (round robin came back to it) ⇒ one task, not two rows.
+    const bucket = byTopic.get(t.id) ?? [];
+    const sameDay = bucket.at(-1);
+    if (sameDay && sameDay.date === date) {
+      sameDay.minutes += minutes;
+      return;
+    }
     const task: NewTask = {
       date,
       kind: "study",
@@ -97,11 +107,8 @@ export function buildSchedule(
       sort: sort++,
     };
     tasks.push(task);
-    const bucket = byTopic.get(t.id) ?? [];
     bucket.push(task);
     byTopic.set(t.id, bucket);
-    dayTotals.set(date, (dayTotals.get(date) ?? 0) + minutes);
-    maxDay = Math.max(maxDay, dayTotals.get(date)!);
   };
 
   // Day-by-day weighted-fair round robin: within each day, repeatedly hand the next slice to
@@ -111,21 +118,26 @@ export function buildSchedule(
     const date = days[day];
     const last = day === days.length - 1;
     const weekday = new Date(date + "T00:00:00Z").getUTCDay();
-    let budget = plan.dailyStudyMinutes;
+    // Pace the whole remaining load evenly over the remaining days (so a light plan fills all 30
+    // days instead of finishing in the first week); a plan heavier than the daily time simply
+    // runs over it evenly rather than piling up at the end.
+    const leftTotal = queues.reduce((n, q) => n + q.topics.reduce((m, t) => m + t.left, 0), 0);
+    let budget = Math.max(30, Math.ceil(leftTotal / (days.length - day)));
     for (;;) {
       // A subject with its own chosen weekdays only shows up on those days — except on the very
       // last day, which must absorb every subject's remaining topics so nothing is left unscheduled.
       const live = queues.filter((q) => q.topics.length && (last || !q.weekdays.length || q.weekdays.includes(weekday)));
       if (!live.length) break;
-      if (!last && budget <= 0) break;
+      if (!last && budget < 15) break; // no 5–10 minute scraps at the end of a day
       live.sort((a, b) => a.vt - b.vt || b.weight - a.weight || a.idx - b.idx);
       const q = live[0];
       const t = q.topics[0];
       const share = round5(Math.max(30, budget / live.length));
-      const bite = last ? t.left : Math.min(t.left, share);
+      let bite = last ? t.left : Math.min(t.left, share);
+      if (t.left - bite < 20) bite = t.left; // finish the topic rather than leave a tiny tail for another day
       pushChunk(q, t, date, bite);
       t.left -= bite;
-      q.vt += bite / q.weight;
+      q.vt += bite / q.total; // progress as a share of the subject, so every subject runs through the whole cycle
       if (!last) budget -= bite;
       if (t.left <= 0) q.topics.shift();
     }

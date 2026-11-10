@@ -10,11 +10,12 @@ import { profiles } from "@/db/schema";
 export async function requireUserId() {
   await connection(); // request-time only (avoids Date.now() prerender errors from the auth client)
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-  return user.id;
+  // getClaims verifies the JWT locally (cached signing keys) instead of a round trip to the auth
+  // server on every page/action — the biggest fixed cost per request.
+  const { data } = await supabase.auth.getClaims();
+  const id = data?.claims?.sub;
+  if (!id) redirect("/login");
+  return id;
 }
 
 /** Signed-in + role is admin/super_admin, or redirects to /dashboard. Every admin page and action calls this. */

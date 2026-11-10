@@ -24,7 +24,9 @@ export async function updateSession(request: NextRequest) {
   );
 
   // IMPORTANT: do not remove. Refreshes the auth token.
-  const { data: { user } } = await supabase.auth.getUser();
+  // getClaims refreshes an expired session (cookie write-back above) and verifies the JWT locally.
+  const { data } = await supabase.auth.getClaims();
+  const user = data?.claims?.sub ? { id: data.claims.sub } : null;
 
   const isAuthRoute = ["/login", "/register", "/verify", "/auth"].some((p) =>
     request.nextUrl.pathname.startsWith(p)

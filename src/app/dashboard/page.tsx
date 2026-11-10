@@ -9,7 +9,7 @@ import { AppShell } from "@/components/app-shell";
 import { getActivePlan, missedCount, tasksForDates, todayFor } from "@/lib/schedule/service";
 import { cycleEnd, learningEnd } from "@/lib/schedule/engine";
 import { addDays } from "@/lib/plan/schema";
-import { TaskList } from "@/components/schedule/task-list";
+import { TaskList, groupBySubject } from "@/components/schedule/task-list";
 import { getActiveFocusSession } from "@/lib/actions/focus";
 import { RescheduleBanner } from "@/components/schedule/reschedule-button";
 import { LiveTimeBudget } from "@/components/schedule/live-time-budget";
@@ -167,15 +167,27 @@ async function TomorrowPreview({ planId, date }: { planId: string; date: string 
   if (!tasks.length) return null;
   return (
     <section className={ui.card}>
-      <h2 className="mb-2 text-sm font-semibold text-muted">আগামীকাল</h2>
-      <ul className="space-y-1 text-sm">
-        {tasks.map((t) => (
-          <li key={t.id} className="flex gap-2">
-            <span className="min-w-0 flex-1 truncate">{t.title}</span>
-            <span className="shrink-0 text-xs text-muted">{fmtMinutes(t.minutes)}</span>
-          </li>
+      <h2 className="mb-3 text-sm font-semibold text-muted">
+        আগামীকাল · {fmtMinutes(tasks.reduce((n, t) => n + t.minutes, 0))}
+      </h2>
+      <div className="space-y-3">
+        {groupBySubject(tasks).map((g) => (
+          <div key={g.name}>
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <span className="min-w-0 flex-1 truncate">{g.name}</span>
+              <span className="shrink-0 text-xs font-normal text-muted">{fmtMinutes(g.minutes)}</span>
+            </div>
+            <ul className="mt-1 space-y-1 border-l-2 border-border pl-3 text-sm">
+              {g.tasks.map((t) => (
+                <li key={t.id} className="flex gap-2">
+                  <span className="min-w-0 flex-1 break-words">{t.title}</span>
+                  <span className="shrink-0 text-xs text-muted">{fmtMinutes(t.minutes)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         ))}
-      </ul>
+      </div>
     </section>
   );
 }
