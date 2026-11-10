@@ -81,31 +81,39 @@ export default async function DashboardPage() {
 
         <RescheduleBanner planId={active.id} missed={missed} />
 
-        <section className={ui.card}>
-          <div className="mb-3 flex flex-wrap items-baseline gap-2">
-            <h2 className="flex-1 font-semibold">আজকের পড়া</h2>
-            {todayMin > 0 && (
-              <span className="text-xs text-muted">
-                {fmtMinutes(todayDone)} / {fmtMinutes(todayMin)}
-              </span>
-            )}
-          </div>
-          {todayMin > 0 && (
-            <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <div className="rounded-lg bg-background p-3 text-center">
-                <p className="text-xs text-muted">আজ মোট</p>
-                <p className="mt-1 text-lg font-semibold">{fmtMinutes(todayMin)}</p>
+        {todayMin > 0 && (
+          <section className={ui.card}>
+            <h2 className="mb-4 font-semibold">আজ আপনার পড়ার হিসাব</h2>
+            <div className="grid grid-cols-3 divide-x divide-border text-center">
+              <div className="px-1">
+                <p className="text-2xl font-bold">{fmtMinutes(todayMin)}</p>
+                <p className="mt-1 text-xs leading-tight text-muted">আজ মোট পড়তে হবে</p>
               </div>
-              <div className="rounded-lg bg-background p-3 text-center">
-                <p className="text-xs text-muted">শেষ হয়েছে</p>
-                <p className="mt-1 text-lg font-semibold text-success">{fmtMinutes(todayDone)}</p>
+              <div className="px-1">
+                <p className="text-2xl font-bold text-success">{fmtMinutes(todayDone)}</p>
+                <p className="mt-1 text-xs leading-tight text-muted">এখন পর্যন্ত পড়া শেষ</p>
               </div>
-              <div className="col-span-2 rounded-lg bg-background p-3 text-center sm:col-span-1">
-                <p className="text-xs text-muted">বাকি আছে</p>
-                <p className="mt-1 text-lg font-semibold text-accent">{fmtMinutes(Math.max(0, todayMin - todayDone))}</p>
+              <div className="px-1">
+                <p className="text-2xl font-bold text-accent">{fmtMinutes(Math.max(0, todayMin - todayDone))}</p>
+                <p className="mt-1 text-xs leading-tight text-muted">আজ আর বাকি আছে</p>
               </div>
             </div>
-          )}
+            <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-background">
+              <div
+                className="h-full rounded-full bg-success transition-all"
+                style={{ width: `${todayMin ? Math.min(100, Math.round((todayDone / todayMin) * 100)) : 0}%` }}
+              />
+            </div>
+            <p className="mt-2 text-center text-xs text-muted">
+              {todayDone >= todayMin
+                ? "🎉 আজকের পড়া সম্পন্ন! অসাধারণ কাজ করেছেন।"
+                : `আজকের লক্ষ্যের ${Math.round((todayDone / todayMin) * 100)}% শেষ হয়েছে`}
+            </p>
+          </section>
+        )}
+
+        <section className={ui.card}>
+          <h2 className="mb-3 font-semibold">আজকের পড়ার তালিকা</h2>
           {notStarted ? (
             <p className="text-sm text-muted">প্ল্যান শুরু হবে {plan.startDate} তারিখে। প্রস্তুত থাকুন! 💪</p>
           ) : isRevision && !study.length ? (
