@@ -7,7 +7,7 @@ import { ui } from "@/components/ui";
 
 export function JsonImport({ onImport }: { onImport: (plan: PlanData) => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
-  const [open, setOpen] = useState<null | "paste" | "prompt">(null);
+  const [open, setOpen] = useState<null | "prompt">(null);
   const [text, setText] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [copied, setCopied] = useState(false);
@@ -45,7 +45,7 @@ export function JsonImport({ onImport }: { onImport: (plan: PlanData) => void })
         <div className="min-w-0 flex-1 basis-56">
           <h2 className="font-semibold">JSON থেকে ইমপোর্ট</h2>
           <p className="mt-0.5 text-xs text-muted">
-            মাস্টার প্রম্পট কপি করে ChatGPT / Claude / Gemini-কে দিন → যে JSON দেবে সেটা এখানে আপলোড বা পেস্ট করুন।
+            মাস্টার প্রম্পট কপি করে ChatGPT / Claude / Gemini-কে দিন → যে JSON দেবে সেটা এখানে ফাইল আপলোড করুন বা নিচে কোড পেস্ট করুন।
           </p>
         </div>
         <div className="flex w-full flex-wrap gap-2 sm:w-auto [&>*]:flex-1 sm:[&>*]:flex-none">
@@ -54,9 +54,6 @@ export function JsonImport({ onImport }: { onImport: (plan: PlanData) => void })
           </button>
           <button type="button" onClick={() => fileRef.current?.click()} className={`${ui.btn} ${ui.secondary}`}>
             📁 ফাইল আপলোড
-          </button>
-          <button type="button" onClick={() => setOpen(open === "paste" ? null : "paste")} className={`${ui.btn} ${ui.secondary}`}>
-            📝 পেস্ট
           </button>
         </div>
         <input ref={fileRef} type="file" accept=".json,application/json,.txt" className="hidden" onChange={onFile} />
@@ -72,10 +69,10 @@ export function JsonImport({ onImport }: { onImport: (plan: PlanData) => void })
         </pre>
       )}
 
-      {open === "paste" && (
-        <div className="mt-3">
+      <div className="mt-3">
+          <label className={ui.label}>অথবা JSON কোড এখানে পেস্ট করুন</label>
           <textarea
-            className={`${ui.input} min-h-40 font-mono text-xs`}
+            className={`${ui.input} min-h-32 font-mono text-xs`}
             value={text}
             placeholder='{ "title": "...", "subjects": [ ... ] }'
             onChange={(e) => setText(e.target.value)}
@@ -84,7 +81,6 @@ export function JsonImport({ onImport }: { onImport: (plan: PlanData) => void })
             ইমপোর্ট করুন
           </button>
         </div>
-      )}
 
       {msg && <p className={`mt-3 text-sm ${msg.ok ? "text-success" : "text-error"}`}>{msg.text}</p>}
     </section>
