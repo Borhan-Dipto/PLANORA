@@ -11,6 +11,8 @@ const NAV_ITEMS = [
   { href: "/progress", key: "progress" as const, icon: "📈" },
 ];
 
+const SETTINGS_ITEM = { href: "/settings", key: "settings" as const, icon: "⚙️" };
+
 export function AppShell({
   children,
   dict,
@@ -39,10 +41,10 @@ export function AppShell({
             </Link>
           ))}
           <Link
-            href="/settings"
+            href={SETTINGS_ITEM.href}
             className="rounded-md px-3 py-2 text-sm text-muted hover:bg-background hover:text-foreground"
           >
-            <span className="mr-2">⚙️</span>
+            <span className="mr-2">{SETTINGS_ITEM.icon}</span>
             {dict.nav.settings}
           </Link>
         </nav>
@@ -52,19 +54,22 @@ export function AppShell({
         </div>
       </aside>
 
-      <div className="flex flex-1 flex-col pb-16 md:pb-0">
+      <div className="flex min-w-0 flex-1 flex-col pb-16 md:pb-0">
         {children}
 
-        {/* Mobile bottom nav */}
-        <nav className="fixed inset-x-0 bottom-0 flex justify-around border-t border-border bg-surface py-2 md:hidden">
-          {NAV_ITEMS.map((item) => (
+        {/* Mobile bottom nav — grid (not flex) so every item, including Settings, always has its own slot and never gets clipped */}
+        <nav
+          className="fixed inset-x-0 bottom-0 z-20 grid border-t border-border bg-surface py-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))] md:hidden"
+          style={{ gridTemplateColumns: `repeat(${NAV_ITEMS.length + 1}, minmax(0, 1fr))` }}
+        >
+          {[...NAV_ITEMS, SETTINGS_ITEM].map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              className="flex flex-col items-center gap-0.5 px-2 text-xs text-muted"
+              className="flex min-w-0 flex-col items-center gap-0.5 px-0.5 text-muted"
             >
-              <span className="text-base">{item.icon}</span>
-              {dict.nav[item.key]}
+              <span className="text-base leading-none">{item.icon}</span>
+              <span className="w-full truncate text-center text-[10px] leading-tight">{dict.nav[item.key]}</span>
             </Link>
           ))}
         </nav>
