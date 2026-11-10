@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, date, timestamp, pgEnum, index } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, integer, date, timestamp, pgEnum, index, boolean } from "drizzle-orm/pg-core";
 import { profiles } from "./profiles";
 import { plans } from "./plans";
 
@@ -23,6 +23,10 @@ export const planTasks = pgTable(
     parts: integer("parts").notNull().default(1),
     sort: integer("sort").notNull().default(0),
     status: taskStatusEnum("status").notNull().default("pending"),
+    /** Set when the user manually fixed this task's minutes for its day — the auto-scheduler
+     * never touches a locked task, and its minutes count as "spoken for" when recomputing how
+     * much of the topic is left for other days, whether or not it's been marked done yet. */
+    locked: boolean("locked").notNull().default(false),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },

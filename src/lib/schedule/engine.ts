@@ -43,7 +43,7 @@ export function datesBetween(from: string, to: string, weekdays: number[]) {
   return out;
 }
 
-const round5 = (n: number) => Math.max(5, Math.round(n / 5) * 5);
+export const round5 = (n: number) => Math.max(5, Math.round(n / 5) * 5);
 
 export function buildSchedule(
   plan: PlanData,
@@ -51,10 +51,12 @@ export function buildSchedule(
   /** topicId → minutes still to study (missing = full estimate) */
   remaining: Map<string, number> = new Map(),
   /** schedule habits from this date (defaults to `from`) */
-  habitsFrom: string = from
+  habitsFrom: string = from,
+  /** dates the user has manually fixed — the auto-engine skips placing study tasks on these */
+  lockedDates: Set<string> = new Set()
 ): ScheduleResult {
   const start = from < plan.startDate ? plan.startDate : from;
-  const days = datesBetween(start, learningEnd(plan), plan.studyWeekdays);
+  const days = datesBetween(start, learningEnd(plan), plan.studyWeekdays).filter((d) => !lockedDates.has(d));
 
   // Per-subject queues of what is left, in the user's order.
   const queues = plan.subjects
@@ -180,12 +182,12 @@ const MIN_REVISION_MINUTES = 10;
  * exam — and get more minutes. If everything doesn't fit in the available revision days at full
  * strength, every topic's time is scaled down proportionally rather than dropping any topic.
  */
-export function buildRevisionTasks(plan: PlanData, from: string): NewTask[] {
+export function buildRevisionTasks(plan: PlanData, from: string, lockedDates: Set<string> = new Set()): NewTask[] {
   const windowStart = addDays(learningEnd(plan), 1);
   const start = from > windowStart ? from : windowStart;
   const end = cycleEnd(plan);
   if (start > end) return [];
-  const days = datesBetween(start, end, plan.studyWeekdays);
+  const days = datesBetween(start, end, plan.studyWeekdays).filter((d) => !lockedDates.has(d));
   if (!days.length) return [];
 
   const items = plan.subjects.flatMap((s) =>

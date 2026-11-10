@@ -25,23 +25,44 @@ export function todayInTz(tz: string) {
  */
 export async function regenerateSchedule(planId: string, userId: string, plan: PlanData, from: string) {
   await db.transaction(async (tx) => {
-    const done = await tx
+    // Minutes already "spoken for" per topic: actually done, OR locked-but-not-yet-done (the user
+    // fixed these manually for their day — the auto-engine must not re-schedule that time elsewhere).
+    const spoken = await tx
       .select({ topicId: planTasks.topicId, minutes: sql<number>`sum(${planTasks.minutes})::int` })
       .from(planTasks)
-      .where(and(eq(planTasks.planId, planId), eq(planTasks.kind, "study"), eq(planTasks.status, "done")))
+      .where(
+        and(
+          eq(planTasks.planId, planId),
+          inArray(planTasks.kind, ["study", "revision"]),
+          sql`(${planTasks.status} = 'done' or ${planTasks.locked} = true)`
+        )
+      )
       .groupBy(planTasks.topicId);
-    const doneBy = new Map(done.map((d) => [d.topicId, d.minutes]));
+    const spokenBy = new Map(spoken.map((d) => [d.topicId, d.minutes]));
 
     const remaining = new Map<string, number>();
     for (const s of plan.subjects)
       for (const t of s.topics) {
-        const left = t.estimatedMinutes - (doneBy.get(t.id) ?? 0);
+        const left = t.estimatedMinutes - (spokenBy.get(t.id) ?? 0);
         remaining.set(t.id, left < 15 ? 0 : left); // tiny leftovers count as finished
       }
 
+    const lockedRows = await tx
+      .select({ date: planTasks.date })
+      .from(planTasks)
+      .where(and(eq(planTasks.planId, planId), eq(planTasks.locked, true), gte(planTasks.date, from)));
+    const lockedDates = new Set(lockedRows.map((r) => r.date));
+
     await tx
       .delete(planTasks)
-      .where(and(eq(planTasks.planId, planId), eq(planTasks.kind, "study"), eq(planTasks.status, "pending")));
+      .where(
+        and(
+          eq(planTasks.planId, planId),
+          eq(planTasks.kind, "study"),
+          eq(planTasks.status, "pending"),
+          eq(planTasks.locked, false)
+        )
+      );
     await tx
       .delete(planTasks)
       .where(
@@ -49,10 +70,17 @@ export async function regenerateSchedule(planId: string, userId: string, plan: P
       );
     await tx
       .delete(planTasks)
-      .where(and(eq(planTasks.planId, planId), eq(planTasks.kind, "revision"), eq(planTasks.status, "pending")));
+      .where(
+        and(
+          eq(planTasks.planId, planId),
+          eq(planTasks.kind, "revision"),
+          eq(planTasks.status, "pending"),
+          eq(planTasks.locked, false)
+        )
+      );
 
-    const { tasks } = buildSchedule(plan, from, remaining);
-    const allTasks = [...tasks, ...buildRevisionTasks(plan, from)];
+    const { tasks } = buildSchedule(plan, from, remaining, from, lockedDates);
+    const allTasks = [...tasks, ...buildRevisionTasks(plan, from, lockedDates)];
     for (let i = 0; i < allTasks.length; i += 500) {
       await tx.insert(planTasks).values(allTasks.slice(i, i + 500).map((t) => ({ ...t, planId, userId })));
     }

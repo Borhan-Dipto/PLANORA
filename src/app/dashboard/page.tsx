@@ -109,6 +109,13 @@ export default async function DashboardPage() {
           />
         )}
 
+        {!notStarted && (
+          <Link href="/planner/day" className={`${ui.card} flex items-center justify-between hover:border-accent`}>
+            <span className="text-sm">🗓️ আজ/আগামীকালের ক্লাস রুটিন অনুযায়ী সময় ঠিক করুন</span>
+            <span className="text-accent">→</span>
+          </Link>
+        )}
+
         <section className={ui.card}>
           <h2 className="mb-3 font-semibold">আজকের পড়ার তালিকা</h2>
           {notStarted ? (
