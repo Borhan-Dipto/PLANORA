@@ -54,8 +54,13 @@ export async function startFocusSession(taskId: string): Promise<{ ok: true; ses
       subjectName: task.subjectName,
       targetMinutes: task.minutes,
     })
+    // A double-tap / second tab can race past the check above; the one-active-per-user index then
+    // rejects the second insert — resume whichever session won instead of throwing.
+    .onConflictDoNothing()
     .returning();
-  return { ok: true, session: toSession(session) };
+  if (session) return { ok: true, session: toSession(session) };
+  const [winner] = await db.select().from(focusSessions).where(and(eq(focusSessions.userId, userId), eq(focusSessions.status, "active")));
+  return winner ? { ok: true, session: toSession(winner) } : { ok: false, error: "ফোকাস সেশন শুরু করা যায়নি, আবার চেষ্টা করুন" };
 }
 
 export async function getActiveFocusSession(): Promise<ActiveSession | null> {

@@ -58,7 +58,7 @@ export async function planMyDay(
 
   const data = plan.planData;
   const kind: "study" | "revision" = date <= learningEnd(data) ? "study" : "revision";
-  if (date > cycleEnd(data)) return { ok: false as const, error: "এই তারিখ প্ল্যানের বাইরে" };
+  if (date < data.startDate || date > cycleEnd(data)) return { ok: false as const, error: "এই তারিখ প্ল্যানের বাইরে" };
 
   const cleanAllocs = allocations.filter((a) => Number.isFinite(a.minutes) && a.minutes > 0);
   if (!cleanAllocs.length) return { ok: false as const, error: "অন্তত একটা টপিকের জন্য সময় দিন" };
@@ -100,6 +100,10 @@ export async function planMyDay(
       );
     await tx.insert(planTasks).values(newTasks);
   });
+  // Rebalance every other day around the newly fixed one: topics the user pulled into this day
+  // must not also appear later, and anything the auto-engine had put here that the user dropped
+  // must move to another day instead of silently disappearing.
+  await regenerateSchedule(planId, userId, data, today);
 
   revalidatePath("/dashboard");
   revalidatePath(`/planner/${planId}/schedule`);

@@ -85,7 +85,9 @@ export function analyzePlan(plan: PlanData): { issues: PlanIssue[]; stats: PlanS
   if (plan.subjects.length === 0) issues.push({ level: "error", message: "কোনো বিষয় যোগ করা হয়নি" });
   for (const s of plan.subjects) {
     if (s.topics.length === 0) issues.push({ level: "error", message: `"${s.name}" বিষয়ে কোনো টপিক নেই` });
-    if (s.weekdays.length && !s.weekdays.some((w) => plan.studyWeekdays.includes(w))) {
+    // Plans saved before per-subject weekdays existed have no `weekdays` in their stored JSON.
+    const days = s.weekdays ?? [];
+    if (days.length && !days.some((w) => plan.studyWeekdays.includes(w))) {
       issues.push({ level: "warning", message: `"${s.name}"-এর বাছাই করা দিনগুলো প্ল্যানের পড়ার দিনের সাথে মিলছে না` });
     }
   }

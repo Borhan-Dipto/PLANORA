@@ -32,7 +32,11 @@ export function PlanEditor({
   active?: boolean;
 }) {
   const router = useRouter();
-  const [plan, setPlan] = useState<PlanData>(initial);
+  // Older stored plans predate per-subject weekdays — fill the default so the editor never sees undefined.
+  const [plan, setPlan] = useState<PlanData>(() => ({
+    ...initial,
+    subjects: initial.subjects.map((s) => ({ ...s, weekdays: s.weekdays ?? [] })),
+  }));
   const [error, setError] = useState("");
   const [pending, start] = useTransition();
   const { issues, stats } = analyzePlan(plan);
