@@ -12,10 +12,11 @@ const AUDIT_ACTION_LABEL: Record<string, string> = {
   "payment.approve": "পেমেন্ট অনুমোদন",
   "payment.reject": "পেমেন্ট বাতিল",
   "code.create": "কোড তৈরি",
+  "role.change": "রোল পরিবর্তন",
 };
 
 export default async function AdminPage() {
-  await requireAdminId();
+  const { role: viewerRole } = await requireAdminId();
 
   const [overview, users, pendingPayments, reviewedPayments, codes, audit] = await Promise.all([
     getAdminOverview(),
@@ -47,7 +48,7 @@ export default async function AdminPage() {
           <CodeGenerator codes={codes} />
         </section>
 
-        <UserTable users={users} />
+        <UserTable users={users} canManageRoles={viewerRole === "super_admin"} />
 
         {reviewedPayments.length > 0 && (
           <section className={ui.card}>

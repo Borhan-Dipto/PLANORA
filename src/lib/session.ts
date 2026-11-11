@@ -18,10 +18,23 @@ export async function requireUserId() {
   return id;
 }
 
-/** Signed-in + role is admin/super_admin, or redirects to /dashboard. Every admin page and action calls this. */
-export async function requireAdminId(): Promise<{ userId: string; role: "admin" | "super_admin" }> {
+type StaffRole = "moderator" | "manager" | "admin" | "super_admin";
+const STAFF_ROLES: readonly StaffRole[] = ["moderator", "manager", "admin", "super_admin"];
+
+/** Signed-in + role is staff (moderator/manager/admin/super_admin), or redirects to /dashboard.
+ * Every admin page and action calls this. */
+export async function requireAdminId(): Promise<{ userId: string; role: StaffRole }> {
   const userId = await requireUserId();
   const [profile] = await db.select({ role: profiles.role }).from(profiles).where(eq(profiles.id, userId));
-  if (!profile || (profile.role !== "admin" && profile.role !== "super_admin")) redirect("/dashboard");
-  return { userId, role: profile.role };
+  if (!profile || !STAFF_ROLES.includes(profile.role as StaffRole)) redirect("/dashboard");
+  return { userId, role: profile.role as StaffRole };
+}
+
+/** Signed-in + role is exactly super_admin, or redirects to /dashboard. Use for actions only the
+ * owner should be able to do — e.g. assigning staff roles to other users. */
+export async function requireSuperAdminId(): Promise<{ userId: string }> {
+  const userId = await requireUserId();
+  const [profile] = await db.select({ role: profiles.role }).from(profiles).where(eq(profiles.id, userId));
+  if (!profile || profile.role !== "super_admin") redirect("/dashboard");
+  return { userId };
 }

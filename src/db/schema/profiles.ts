@@ -1,6 +1,11 @@
 import { pgTable, uuid, text, timestamp, boolean, pgEnum } from "drizzle-orm/pg-core";
 
-export const appRoleEnum = pgEnum("app_role", ["user", "admin", "super_admin"]);
+// Order here is display/hierarchy order, not the DB's physical enum order (Postgres enums keep
+// values in the order they were first created; "moderator"/"manager" were added later via
+// ALTER TYPE, so the DB's own ordering is user/admin/super_admin/moderator/manager — harmless,
+// since nothing sorts by the enum's native order).
+export const appRoleEnum = pgEnum("app_role", ["user", "moderator", "manager", "admin", "super_admin"]);
+export const ASSIGNABLE_ROLES = ["user", "moderator", "manager", "admin", "super_admin"] as const;
 
 /**
  * Mirrors auth.users (Supabase Auth). id = auth.users.id (1:1).

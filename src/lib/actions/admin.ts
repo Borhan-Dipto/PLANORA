@@ -11,8 +11,9 @@ import {
   adminAuditLogs,
   aiUsageLogs,
   plans,
+  ASSIGNABLE_ROLES,
 } from "@/db/schema";
-import { requireAdminId } from "@/lib/session";
+import { requireAdminId, requireSuperAdminId } from "@/lib/session";
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 
@@ -61,6 +62,25 @@ export async function setUserSuspended(userId: string, suspended: boolean): Prom
   if (userId === actorId) return { ok: false, error: "নিজেকে সাসপেন্ড করা যাবে না" };
   await db.update(profiles).set({ isSuspended: suspended, updatedAt: new Date() }).where(eq(profiles.id, userId));
   await audit(actorId, suspended ? "user.suspend" : "user.unsuspend", "profile", userId);
+  revalidatePath("/admin");
+  return { ok: true };
+}
+
+/** Super-admin only: assign any role (user/moderator/manager/admin/super_admin) to any user —
+ * the "grow the team" control (managers, moderators, etc. as the company hires). */
+export async function setUserRole(userId: string, role: string): Promise<Result> {
+  const { userId: actorId } = await requireSuperAdminId();
+  if (!ASSIGNABLE_ROLES.includes(role as (typeof ASSIGNABLE_ROLES)[number]))
+    return { ok: false, error: "রোলটি সঠিক নয়" };
+  if (userId === actorId && role !== "super_admin")
+    return { ok: false, error: "নিজের সুপার অ্যাডমিন রোল এখান থেকে পরিবর্তন করা যাবে না" };
+
+  const [before] = await db.select({ role: profiles.role }).from(profiles).where(eq(profiles.id, userId));
+  await db
+    .update(profiles)
+    .set({ role: role as (typeof ASSIGNABLE_ROLES)[number], updatedAt: new Date() })
+    .where(eq(profiles.id, userId));
+  await audit(actorId, "role.change", "profile", userId, { from: before?.role, to: role });
   revalidatePath("/admin");
   return { ok: true };
 }
