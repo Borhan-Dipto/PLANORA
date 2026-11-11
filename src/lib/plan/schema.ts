@@ -81,10 +81,16 @@ export function analyzePlan(plan: PlanData): { issues: PlanIssue[]; stats: PlanS
   const issues: PlanIssue[] = [];
   const stats = planStats(plan);
 
+  // Defensive: a plan row saved by an older/different code path (or a partially-failed AI
+  // generation) can have planData that doesn't fully match the current shape — e.g. a missing
+  // `subjects` array. Treat those as empty rather than throwing, so viewing such a plan degrades
+  // to "no subjects yet" instead of a hard crash.
+  const subjects = plan.subjects ?? [];
   if (!plan.title.trim()) issues.push({ level: "error", message: "প্ল্যানের নাম নেই" });
-  if (plan.subjects.length === 0) issues.push({ level: "error", message: "কোনো বিষয় যোগ করা হয়নি" });
-  for (const s of plan.subjects) {
-    if (s.topics.length === 0) issues.push({ level: "error", message: `"${s.name}" বিষয়ে কোনো টপিক নেই` });
+  if (subjects.length === 0) issues.push({ level: "error", message: "কোনো বিষয় যোগ করা হয়নি" });
+  for (const s of subjects) {
+    const topics = s.topics ?? [];
+    if (topics.length === 0) issues.push({ level: "error", message: `"${s.name}" বিষয়ে কোনো টপিক নেই` });
     // Plans saved before per-subject weekdays existed have no `weekdays` in their stored JSON.
     const days = s.weekdays ?? [];
     if (days.length && !days.some((w) => plan.studyWeekdays.includes(w))) {
@@ -119,12 +125,14 @@ export type PlanStats = {
 };
 
 export function planStats(plan: PlanData): PlanStats {
-  const totalTopics = plan.subjects.reduce((n, s) => n + s.topics.length, 0);
-  const totalMinutes = plan.subjects.reduce((n, s) => n + s.topics.reduce((m, t) => m + t.estimatedMinutes, 0), 0);
+  const subjects = plan.subjects ?? [];
+  const studyWeekdays = plan.studyWeekdays ?? [];
+  const totalTopics = subjects.reduce((n, s) => n + (s.topics ?? []).length, 0);
+  const totalMinutes = subjects.reduce((n, s) => n + (s.topics ?? []).reduce((m, t) => m + t.estimatedMinutes, 0), 0);
   let studyDayCount = 0;
   for (let i = 0; i < plan.learningDays; i++) {
     const wd = new Date(addDays(plan.startDate, i) + "T00:00:00Z").getUTCDay();
-    if (plan.studyWeekdays.includes(wd)) studyDayCount++;
+    if (studyWeekdays.includes(wd)) studyDayCount++;
   }
   const availableMinutes = studyDayCount * plan.dailyStudyMinutes;
   return {

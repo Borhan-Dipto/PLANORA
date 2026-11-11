@@ -19,7 +19,15 @@ export default async function PlanPreviewPage({ params }: PageProps<"/planner/[i
   const [plan] = await db.select().from(plans).where(and(eq(plans.id, id), eq(plans.userId, userId)));
   if (!plan) notFound();
 
-  const d = plan.planData;
+  // Normalize once here: a plan row saved by an older/different code path (or a partially-failed
+  // AI generation) can be missing fields this page assumes exist — fall back to empty rather than
+  // crashing the whole page.
+  const d: typeof plan.planData = {
+    ...plan.planData,
+    subjects: (plan.planData.subjects ?? []).map((s) => ({ ...s, topics: s.topics ?? [] })),
+    studyWeekdays: plan.planData.studyWeekdays ?? [],
+    dailyTargets: plan.planData.dailyTargets ?? [],
+  };
   const { issues, stats } = analyzePlan(d);
   const canApprove = !issues.some((i) => i.level === "error");
 

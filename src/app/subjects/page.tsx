@@ -73,7 +73,6 @@ export default async function SubjectsPage() {
               <ul className="mt-3 divide-y divide-border border-t border-border">
                 {s.topics.map((t) => {
                   const done = Math.min(t.estimatedMinutes, doneByTopic.get(t.id) ?? 0);
-                  const tp = t.estimatedMinutes ? Math.round((done / t.estimatedMinutes) * 100) : 0;
                   return (
                     <li key={t.id} className="flex items-center gap-3 py-2 text-sm">
                       <span

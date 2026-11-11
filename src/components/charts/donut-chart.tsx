@@ -16,16 +16,15 @@ export function DonutChart({
   const c = size / 2;
   const circumference = 2 * Math.PI * r;
 
-  let offset = 0;
   const arcs = segments
     .filter((s) => s.value > 0)
-    .map((s) => {
+    .reduce<{ label: string; value: number; color: string; dash: number; offset: number }[]>((acc, s) => {
       const frac = s.value / total;
       const dash = frac * circumference;
-      const arc = { ...s, dash, offset };
-      offset += dash;
-      return arc;
-    });
+      const offset = acc.length ? acc[acc.length - 1].offset + acc[acc.length - 1].dash : 0;
+      acc.push({ ...s, dash, offset });
+      return acc;
+    }, []);
 
   return (
     <svg viewBox={`0 0 ${size} ${size}`} className="h-40 w-40 shrink-0 -rotate-90" role="img" aria-label="বিষয়ভিত্তিক সময় বণ্টন">
