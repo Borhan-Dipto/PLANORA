@@ -1,6 +1,6 @@
 /** Shared Tailwind class strings — keeps every screen visually consistent and responsive. */
 export const ui = {
-  card: "rounded-2xl border border-border bg-surface p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)] sm:p-5",
+  card: "app-card rounded-2xl border border-border bg-surface p-4 sm:p-5",
   input:
     "w-full min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-60",
   label: "mb-1 block text-xs font-medium text-muted",

@@ -12,7 +12,7 @@ export default function LoginPage() {
 
   return (
     <AuthShell>
-      <form action={action} className={`${ui.card} space-y-4 shadow-[0_8px_24px_rgba(16,24,40,0.08)]`}>
+      <form action={action} className={`${ui.card} space-y-4`}>
         <div>
           <h1 className="text-xl font-semibold">লগইন করুন বা নতুন অ্যাকাউন্ট খুলুন</h1>
           <p key={showPassword ? "pw" : "email"} className="mt-1 text-sm text-muted animate-field-in">

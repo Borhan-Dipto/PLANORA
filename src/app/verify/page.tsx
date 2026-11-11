@@ -13,7 +13,7 @@ function VerifyForm() {
   const email = useSearchParams().get("email") ?? "";
 
   return (
-    <div className={`${ui.card} space-y-4 shadow-[0_8px_24px_rgba(16,24,40,0.08)]`}>
+    <div className={`${ui.card} space-y-4`}>
       <div>
         <h1 className="text-xl font-semibold">কোড যাচাই করুন</h1>
         <p className="mt-1 text-sm text-muted">

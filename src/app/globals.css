@@ -1,8 +1,10 @@
 @import "tailwindcss";
 
-/* "Warm Charcoal" — PLANORA's one house theme: deep charcoal surfaces with a warm amber accent.
-   Used for both the default and the explicit "dark" choice, so the theme toggle still works but
-   never leaves this palette — this is the chosen look everywhere, not just a dark mode. */
+/* "Warm Charcoal" — PLANORA's house theme: deep charcoal surfaces with a warm amber accent.
+   Used for both the default and the explicit "dark" choice — the theme toggle's dark option
+   never leaves this palette. The "light" choice below is a proper sibling theme (same amber
+   brand accent, warm paper-white surfaces), not a reskin — it was previously missing entirely,
+   which is why picking "light" used to just render Warm Charcoal again. */
 :root,
 :root[data-theme="dark"] {
   --font-hind: "Hind Siliguri";
@@ -20,6 +22,13 @@
   --warning: #FBBF24;
   --error: #F87171;
 
+  /* Elevation — a plain, close shadow. Dark surfaces don't need much more: on a near-black
+     background a heavy shadow just disappears, so "3D" here comes mainly from the accent-glow
+     highlights (.insight-card, button gradients) rather than drop shadows. */
+  --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 1px rgba(255, 255, 255, 0.03) inset;
+  --card-shadow-hover: 0 10px 28px -10px rgba(0, 0, 0, 0.45), 0 1px 1px rgba(255, 255, 255, 0.04) inset;
+  --glow-opacity: 35%;
+
   /* Data-viz palette only — used for multi-series charts (subject distribution, etc.) where a
      single accent colour can't distinguish categories. Not a second theme: the app surface,
      text and buttons stay on the Warm Charcoal palette above everywhere. */
@@ -28,6 +37,46 @@
   --chart-violet: #A78BFA;
   --chart-teal: #4FD1C5;
   --chart-rose: #F178B6;
+}
+
+/* Light — same amber brand accent, warm ivory-paper surfaces instead of charcoal. The "premium,
+   3D" feel here comes from real elevation: layered, warm-tinted shadows (not flat grey) plus a
+   glossy inner top highlight on cards and buttons, like a card resting under soft studio light —
+   see --card-shadow / --card-shadow-hover and .app-card below. */
+:root[data-theme="light"] {
+  --font-hind: "Hind Siliguri";
+  --font-space: "Outfit";
+  --background: #F3EFE7;
+  --surface: #FFFFFF;
+  --surface-elevated: #FFFFFF;
+  --foreground: #211C14;
+  --muted: #80766A;
+  --border: #E6DFD2;
+  --accent: #C8810B;
+  --accent-light: #E0A039;
+  --accent-foreground: #FFFBF3;
+  --success: #15803D;
+  --warning: #B45309;
+  --error: #DC2626;
+
+  /* Elevation — warm-tinted (not neutral-grey) layered shadows, the main "3D" cue on a light
+     surface: a tight contact shadow plus a soft, wide ambient one, and a 1px glossy top
+     highlight so cards read as resting slightly above the page rather than pasted flat on it. */
+  --card-shadow:
+    0 1px 1px rgba(120, 85, 30, 0.06),
+    0 10px 24px -14px rgba(120, 85, 30, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --card-shadow-hover:
+    0 2px 2px rgba(120, 85, 30, 0.07),
+    0 22px 44px -18px rgba(120, 85, 30, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  --glow-opacity: 16%;
+
+  --chart-amber: var(--accent);
+  --chart-blue: #2F6FD6;
+  --chart-violet: #7C5CD6;
+  --chart-teal: #0F9488;
+  --chart-rose: #D1497B;
 }
 
 @theme inline {
@@ -152,7 +201,27 @@ button:active:not(:disabled) {
   inset: -40% -20% auto auto;
   width: 70%;
   aspect-ratio: 1;
-  background: radial-gradient(circle, color-mix(in srgb, var(--tint, var(--accent)) 35%, transparent) 0%, transparent 70%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--tint, var(--accent)) var(--glow-opacity, 35%), transparent) 0%, transparent 70%);
   z-index: -1;
   pointer-events: none;
+}
+
+/* Every ui.card in the app gets real elevation (see --card-shadow / --card-shadow-hover per
+   theme above) plus a gentle lift on hover — the "3D, premium" cue the flat
+   shadow-[0_1px_2px_rgba(...)] utility used to flatten away, especially in light mode. */
+.app-card {
+  box-shadow: var(--card-shadow);
+  transition: box-shadow 200ms ease, transform 200ms ease;
+}
+.app-card:hover {
+  box-shadow: var(--card-shadow-hover);
+  transform: translateY(-2px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-card {
+    transition: none;
+  }
+  .app-card:hover {
+    transform: none;
+  }
 }

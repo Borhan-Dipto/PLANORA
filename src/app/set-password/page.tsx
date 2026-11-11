@@ -10,7 +10,7 @@ export default function SetPasswordPage() {
 
   return (
     <AuthShell>
-      <form action={action} className={`${ui.card} space-y-4 shadow-[0_8px_24px_rgba(16,24,40,0.08)]`}>
+      <form action={action} className={`${ui.card} space-y-4`}>
         <div>
           <h1 className="text-xl font-semibold">একটা পাসওয়ার্ড সেট করুন</h1>
           <p className="mt-1 text-sm text-muted">
