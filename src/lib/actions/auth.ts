@@ -38,7 +38,16 @@ export async function verifyEmailOtp(_prev: ActionResult, formData: FormData): P
     token: parsed.data.token,
     type: "email",
   });
-  if (error) return { error: "কোডটি ভুল বা মেয়াদ শেষ হয়ে গেছে।" };
+  if (error) {
+    // Codes are single-use. If a slow network made the user resubmit (double-tap, or
+    // the first request actually succeeded but the page didn't redirect in time), the
+    // first call already consumed the code and logged them in — this second call then
+    // fails with "invalid/expired" even though a real session exists. Check before
+    // showing an error so a successful login never looks like a failure.
+    const { data } = await supabase.auth.getUser();
+    if (data.user) redirect("/dashboard");
+    return { error: "কোডটি ভুল বা মেয়াদ শেষ হয়ে গেছে।" };
+  }
 
   redirect("/dashboard");
 }
