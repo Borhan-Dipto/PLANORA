@@ -19,6 +19,15 @@
   --success: #4ADE80;
   --warning: #FBBF24;
   --error: #F87171;
+
+  /* Data-viz palette only — used for multi-series charts (subject distribution, etc.) where a
+     single accent colour can't distinguish categories. Not a second theme: the app surface,
+     text and buttons stay on the Warm Charcoal palette above everywhere. */
+  --chart-amber: var(--accent);
+  --chart-blue: #5B9FED;
+  --chart-violet: #A78BFA;
+  --chart-teal: #4FD1C5;
+  --chart-rose: #F178B6;
 }
 
 @theme inline {
@@ -34,6 +43,11 @@
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-error: var(--error);
+  --color-chart-amber: var(--chart-amber);
+  --color-chart-blue: var(--chart-blue);
+  --color-chart-violet: var(--chart-violet);
+  --color-chart-teal: var(--chart-teal);
+  --color-chart-rose: var(--chart-rose);
 }
 
 body {
@@ -123,4 +137,22 @@ button:active:not(:disabled) {
   .auth-scene * {
     animation: none !important;
   }
+}
+
+/* Insights/progress — premium stat-card treatment: a soft tinted glow (via --tint, set per card)
+   behind the Warm Charcoal surface, instead of flattening to one grey card everywhere. */
+.insight-card {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.insight-card::before {
+  content: "";
+  position: absolute;
+  inset: -40% -20% auto auto;
+  width: 70%;
+  aspect-ratio: 1;
+  background: radial-gradient(circle, color-mix(in srgb, var(--tint, var(--accent)) 35%, transparent) 0%, transparent 70%);
+  z-index: -1;
+  pointer-events: none;
 }
