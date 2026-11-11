@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { and, eq, sql } from "drizzle-orm";
-import { db } from "@/db/client";
+import { db, withDbRetry } from "@/db/client";
 import { profiles, planTasks, userPreferences } from "@/db/schema";
 import { signOut } from "@/lib/actions/auth";
 import { requireUserId } from "@/lib/session";
@@ -26,8 +26,8 @@ export default async function DashboardPage() {
   const userId = await requireUserId();
   const today = await todayFor(userId);
   const [[profile], [prefs], dict, locale, active, focusSession] = await Promise.all([
-    db.select().from(profiles).where(eq(profiles.id, userId)),
-    db.select().from(userPreferences).where(eq(userPreferences.userId, userId)),
+    withDbRetry(() => db.select().from(profiles).where(eq(profiles.id, userId))),
+    withDbRetry(() => db.select().from(userPreferences).where(eq(userPreferences.userId, userId))),
     getDictionary(),
     getLocale(),
     getActivePlan(userId, today),

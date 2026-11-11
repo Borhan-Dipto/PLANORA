@@ -1,13 +1,15 @@
 import "server-only";
 import { and, eq, inArray, lt, gte, sql } from "drizzle-orm";
-import { db } from "@/db/client";
+import { db, withDbRetry } from "@/db/client";
 import { plans, planTasks, profiles } from "@/db/schema";
 import type { PlanData } from "@/lib/plan/schema";
 import { buildRevisionTasks, buildSchedule, cycleEnd } from "./engine";
 
 /** Today's date (YYYY-MM-DD) in the user's timezone. */
 export async function todayFor(userId: string) {
-  const [p] = await db.select({ tz: profiles.timezone }).from(profiles).where(eq(profiles.id, userId));
+  const [p] = await withDbRetry(() =>
+    db.select({ tz: profiles.timezone }).from(profiles).where(eq(profiles.id, userId)),
+  );
   return todayInTz(p?.tz || "Asia/Dhaka");
 }
 

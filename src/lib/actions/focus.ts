@@ -2,7 +2,7 @@
 
 import { and, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { db } from "@/db/client";
+import { db, withDbRetry } from "@/db/client";
 import { focusSessions, planTasks } from "@/db/schema";
 import { requireUserId } from "@/lib/session";
 
@@ -65,7 +65,9 @@ export async function startFocusSession(taskId: string): Promise<{ ok: true; ses
 
 export async function getActiveFocusSession(): Promise<ActiveSession | null> {
   const userId = await requireUserId();
-  const [s] = await db.select().from(focusSessions).where(and(eq(focusSessions.userId, userId), eq(focusSessions.status, "active")));
+  const [s] = await withDbRetry(() =>
+    db.select().from(focusSessions).where(and(eq(focusSessions.userId, userId), eq(focusSessions.status, "active"))),
+  );
   return s ? toSession(s) : null;
 }
 
