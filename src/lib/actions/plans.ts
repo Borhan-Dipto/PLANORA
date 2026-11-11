@@ -45,11 +45,13 @@ export async function savePlan(planId: string | null, source: Source, input: unk
     return { ok: false, error: "এই প্ল্যানটি আর এডিট করা যায় না" };
 
   const data = n.data;
-  if (existing.status === "active") {
+  // Computed once and reused below — this used to call todayFor() (a profiles query) a second
+  // time a few lines later for the same request, an unnecessary extra DB round-trip.
+  const today = existing.status === "active" ? await todayFor(userId) : null;
+  if (today !== null) {
     // The cycle has already started, but the user may still push the start date to today or
     // later (e.g. approved today, actually wants to begin in two days) — never into the past,
     // since days before today may already have done/locked work.
-    const today = await todayFor(userId);
     if (data.startDate < today) data.startDate = existing.planData.startDate < today ? today : existing.planData.startDate;
     const blocking = analyzePlan(data).issues.find((i) => i.level === "error");
     if (blocking) return { ok: false, error: blocking.message };
@@ -59,8 +61,8 @@ export async function savePlan(planId: string | null, source: Source, input: unk
     .update(plans)
     .set({ title: data.title, planData: data, startDate: data.startDate, updatedAt: new Date() })
     .where(eq(plans.id, planId));
-  if (existing.status === "active") {
-    await regenerateSchedule(planId, userId, data, await todayFor(userId));
+  if (today !== null) {
+    await regenerateSchedule(planId, userId, data, today);
     revalidatePath("/dashboard");
     revalidatePath(`/planner/${planId}/schedule`);
   }

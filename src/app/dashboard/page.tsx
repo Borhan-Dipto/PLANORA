@@ -6,7 +6,7 @@ import { signOut } from "@/lib/actions/auth";
 import { requireUserId } from "@/lib/session";
 import { getDictionary, getLocale } from "@/lib/i18n";
 import { AppShell } from "@/components/app-shell";
-import { getActivePlan, missedCount, tasksForDates, todayFor } from "@/lib/schedule/service";
+import { getActivePlan, missedCount, tasksForDates, todayInTz } from "@/lib/schedule/service";
 import { cycleEnd, learningEnd } from "@/lib/schedule/engine";
 import { addDays } from "@/lib/plan/schema";
 import { TaskList } from "@/components/schedule/task-list";
@@ -24,9 +24,11 @@ function dayNumber(start: string, today: string) {
 
 export default async function DashboardPage() {
   const userId = await requireUserId();
-  const today = await todayFor(userId);
-  const [[profile], [prefs], dict, locale, active, focusSession] = await Promise.all([
-    withDbRetry(() => db.select().from(profiles).where(eq(profiles.id, userId))),
+  // One profiles lookup, reused for both the timezone (-> "today") and the header's display
+  // name/email — this page used to fetch the profiles row twice (once via todayFor(), once here).
+  const [profile] = await withDbRetry(() => db.select().from(profiles).where(eq(profiles.id, userId)));
+  const today = todayInTz(profile?.timezone || "Asia/Dhaka");
+  const [[prefs], dict, locale, active, focusSession] = await Promise.all([
     withDbRetry(() => db.select().from(userPreferences).where(eq(userPreferences.userId, userId))),
     getDictionary(),
     getLocale(),
