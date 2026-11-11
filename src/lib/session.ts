@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { db } from "@/db/client";
+import { db, withDbRetry } from "@/db/client";
 import { profiles } from "@/db/schema";
 
 /** Returns the signed-in user's id or redirects to /login. */
@@ -25,7 +25,9 @@ const STAFF_ROLES: readonly StaffRole[] = ["moderator", "manager", "admin", "sup
  * Every admin page and action calls this. */
 export async function requireAdminId(): Promise<{ userId: string; role: StaffRole }> {
   const userId = await requireUserId();
-  const [profile] = await db.select({ role: profiles.role }).from(profiles).where(eq(profiles.id, userId));
+  const [profile] = await withDbRetry(() =>
+    db.select({ role: profiles.role }).from(profiles).where(eq(profiles.id, userId)),
+  );
   if (!profile || !STAFF_ROLES.includes(profile.role as StaffRole)) redirect("/dashboard");
   return { userId, role: profile.role as StaffRole };
 }
@@ -34,7 +36,9 @@ export async function requireAdminId(): Promise<{ userId: string; role: StaffRol
  * owner should be able to do — e.g. assigning staff roles to other users. */
 export async function requireSuperAdminId(): Promise<{ userId: string }> {
   const userId = await requireUserId();
-  const [profile] = await db.select({ role: profiles.role }).from(profiles).where(eq(profiles.id, userId));
+  const [profile] = await withDbRetry(() =>
+    db.select({ role: profiles.role }).from(profiles).where(eq(profiles.id, userId)),
+  );
   if (!profile || profile.role !== "super_admin") redirect("/dashboard");
   return { userId };
 }

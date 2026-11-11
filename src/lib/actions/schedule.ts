@@ -2,7 +2,7 @@
 
 import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { db } from "@/db/client";
+import { db, withDbRetry } from "@/db/client";
 import { plans, planTasks } from "@/db/schema";
 import { requireUserId } from "@/lib/session";
 import { regenerateSchedule, todayFor } from "@/lib/schedule/service";
@@ -11,10 +11,12 @@ import { addDays } from "@/lib/plan/schema";
 
 export async function setTaskDone(taskId: string, done: boolean) {
   const userId = await requireUserId();
-  await db
-    .update(planTasks)
-    .set({ status: done ? "done" : "pending", completedAt: done ? new Date() : null })
-    .where(and(eq(planTasks.id, taskId), eq(planTasks.userId, userId)));
+  await withDbRetry(() =>
+    db
+      .update(planTasks)
+      .set({ status: done ? "done" : "pending", completedAt: done ? new Date() : null })
+      .where(and(eq(planTasks.id, taskId), eq(planTasks.userId, userId))),
+  );
   revalidatePath("/dashboard");
   return { ok: true as const };
 }
@@ -22,10 +24,12 @@ export async function setTaskDone(taskId: string, done: boolean) {
 /** "I fell behind" — spread every missed study task over the remaining days from today. */
 export async function rescheduleMissed(planId: string) {
   const userId = await requireUserId();
-  const [plan] = await db
-    .select()
-    .from(plans)
-    .where(and(eq(plans.id, planId), eq(plans.userId, userId), eq(plans.status, "active")));
+  const [plan] = await withDbRetry(() =>
+    db
+      .select()
+      .from(plans)
+      .where(and(eq(plans.id, planId), eq(plans.userId, userId), eq(plans.status, "active"))),
+  );
   if (!plan) return { ok: false as const, error: "চলমান প্ল্যান পাওয়া যায়নি" };
   await regenerateSchedule(plan.id, userId, plan.planData, await todayFor(userId));
   revalidatePath("/dashboard");
@@ -46,10 +50,12 @@ export async function planMyDay(
   allocations: { subjectId: string; topicId: string; minutes: number }[]
 ) {
   const userId = await requireUserId();
-  const [plan] = await db
-    .select()
-    .from(plans)
-    .where(and(eq(plans.id, planId), eq(plans.userId, userId), eq(plans.status, "active")));
+  const [plan] = await withDbRetry(() =>
+    db
+      .select()
+      .from(plans)
+      .where(and(eq(plans.id, planId), eq(plans.userId, userId), eq(plans.status, "active"))),
+  );
   if (!plan) return { ok: false as const, error: "চলমান প্ল্যান পাওয়া যায়নি" };
 
   const today = await todayFor(userId);
@@ -87,19 +93,21 @@ export async function planMyDay(
   }
   if (!newTasks.length) return { ok: false as const, error: "এই টপিকগুলো প্ল্যানে পাওয়া যায়নি" };
 
-  await db.transaction(async (tx) => {
-    await tx
-      .delete(planTasks)
-      .where(
-        and(
-          eq(planTasks.planId, planId),
-          eq(planTasks.date, date),
-          inArray(planTasks.kind, ["study", "revision"]),
-          eq(planTasks.status, "pending")
-        )
-      );
-    await tx.insert(planTasks).values(newTasks);
-  });
+  await withDbRetry(() =>
+    db.transaction(async (tx) => {
+      await tx
+        .delete(planTasks)
+        .where(
+          and(
+            eq(planTasks.planId, planId),
+            eq(planTasks.date, date),
+            inArray(planTasks.kind, ["study", "revision"]),
+            eq(planTasks.status, "pending")
+          )
+        );
+      await tx.insert(planTasks).values(newTasks);
+    }),
+  );
   // Rebalance every other day around the newly fixed one: topics the user pulled into this day
   // must not also appear later, and anything the auto-engine had put here that the user dropped
   // must move to another day instead of silently disappearing.
@@ -114,23 +122,27 @@ export async function planMyDay(
 /** Un-fix a manually planned day — removes its locked tasks and lets the automatic engine take it back over. */
 export async function unlockDay(planId: string, date: string) {
   const userId = await requireUserId();
-  const [plan] = await db
-    .select()
-    .from(plans)
-    .where(and(eq(plans.id, planId), eq(plans.userId, userId), eq(plans.status, "active")));
+  const [plan] = await withDbRetry(() =>
+    db
+      .select()
+      .from(plans)
+      .where(and(eq(plans.id, planId), eq(plans.userId, userId), eq(plans.status, "active"))),
+  );
   if (!plan) return { ok: false as const, error: "চলমান প্ল্যান পাওয়া যায়নি" };
 
-  await db
-    .delete(planTasks)
-    .where(
-      and(
-        eq(planTasks.planId, planId),
-        eq(planTasks.date, date),
-        inArray(planTasks.kind, ["study", "revision"]),
-        eq(planTasks.locked, true),
-        eq(planTasks.status, "pending")
-      )
-    );
+  await withDbRetry(() =>
+    db
+      .delete(planTasks)
+      .where(
+        and(
+          eq(planTasks.planId, planId),
+          eq(planTasks.date, date),
+          inArray(planTasks.kind, ["study", "revision"]),
+          eq(planTasks.locked, true),
+          eq(planTasks.status, "pending")
+        )
+      ),
+  );
 
   const today = await todayFor(userId);
   await regenerateSchedule(planId, userId, plan.planData, date < today ? today : date);

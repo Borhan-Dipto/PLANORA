@@ -2,7 +2,7 @@
 
 import { and, eq, gte, count, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { db } from "@/db/client";
+import { db, withDbRetry } from "@/db/client";
 import { plans, aiUsageLogs } from "@/db/schema";
 import { requireUserId } from "@/lib/session";
 import { analyzePlan, planDataSchema, FREE_REVISION_DAYS, todayIso, type PlanData } from "@/lib/plan/schema";
@@ -24,10 +24,12 @@ async function normalise(userId: string, input: unknown): Promise<Result<{ data:
 }
 
 async function insertDraft(userId: string, source: Source, data: PlanData) {
-  const [row] = await db
-    .insert(plans)
-    .values({ userId, source, title: data.title, planData: data, startDate: data.startDate })
-    .returning({ id: plans.id });
+  const [row] = await withDbRetry(() =>
+    db
+      .insert(plans)
+      .values({ userId, source, title: data.title, planData: data, startDate: data.startDate })
+      .returning({ id: plans.id }),
+  );
   revalidatePath("/planner");
   return row.id;
 }
@@ -40,7 +42,9 @@ export async function savePlan(planId: string | null, source: Source, input: unk
 
   if (!planId) return { ok: true, id: await insertDraft(userId, source, n.data) };
 
-  const [existing] = await db.select().from(plans).where(and(eq(plans.id, planId), eq(plans.userId, userId)));
+  const [existing] = await withDbRetry(() =>
+    db.select().from(plans).where(and(eq(plans.id, planId), eq(plans.userId, userId))),
+  );
   if (!existing || (existing.status !== "draft" && existing.status !== "active"))
     return { ok: false, error: "এই প্ল্যানটি আর এডিট করা যায় না" };
 
@@ -57,10 +61,12 @@ export async function savePlan(planId: string | null, source: Source, input: unk
     if (blocking) return { ok: false, error: blocking.message };
   }
 
-  await db
-    .update(plans)
-    .set({ title: data.title, planData: data, startDate: data.startDate, updatedAt: new Date() })
-    .where(eq(plans.id, planId));
+  await withDbRetry(() =>
+    db
+      .update(plans)
+      .set({ title: data.title, planData: data, startDate: data.startDate, updatedAt: new Date() })
+      .where(eq(plans.id, planId)),
+  );
   if (today !== null) {
     await regenerateSchedule(planId, userId, data, today);
     revalidatePath("/dashboard");
@@ -72,26 +78,32 @@ export async function savePlan(planId: string | null, source: Source, input: unk
 
 export async function approvePlan(planId: string): Promise<Result> {
   const userId = await requireUserId();
-  const [plan] = await db.select().from(plans).where(and(eq(plans.id, planId), eq(plans.userId, userId)));
+  const [plan] = await withDbRetry(() =>
+    db.select().from(plans).where(and(eq(plans.id, planId), eq(plans.userId, userId))),
+  );
   if (!plan || plan.status !== "draft") return { ok: false, error: "প্ল্যানটি পাওয়া যায়নি" };
 
   const { issues } = analyzePlan(plan.planData);
   const blocking = issues.find((i) => i.level === "error");
   if (blocking) return { ok: false, error: blocking.message };
 
-  const [active] = await db
-    .select({ c: count() })
-    .from(plans)
-    .where(and(eq(plans.userId, userId), eq(plans.status, "active"), ne(plans.id, planId)));
+  const [active] = await withDbRetry(() =>
+    db
+      .select({ c: count() })
+      .from(plans)
+      .where(and(eq(plans.userId, userId), eq(plans.status, "active"), ne(plans.id, planId))),
+  );
   if (active.c > 0) return { ok: false, error: "আপনার একটি চলমান প্ল্যান আছে। আগে সেটি আর্কাইভ করুন।" };
 
   // A draft whose start date has already passed starts today, so the full 30 days are available.
   const today = await todayFor(userId);
   const data = plan.planData.startDate < today ? { ...plan.planData, startDate: today } : plan.planData;
-  await db
-    .update(plans)
-    .set({ status: "active", planData: data, startDate: data.startDate, approvedAt: new Date(), updatedAt: new Date() })
-    .where(eq(plans.id, planId));
+  await withDbRetry(() =>
+    db
+      .update(plans)
+      .set({ status: "active", planData: data, startDate: data.startDate, approvedAt: new Date(), updatedAt: new Date() })
+      .where(eq(plans.id, planId)),
+  );
   await regenerateSchedule(planId, userId, data, today);
   revalidatePath("/planner");
   revalidatePath("/dashboard");
@@ -100,10 +112,12 @@ export async function approvePlan(planId: string): Promise<Result> {
 
 export async function archivePlan(planId: string): Promise<Result> {
   const userId = await requireUserId();
-  await db
-    .update(plans)
-    .set({ status: "archived", updatedAt: new Date() })
-    .where(and(eq(plans.id, planId), eq(plans.userId, userId), eq(plans.status, "active")));
+  await withDbRetry(() =>
+    db
+      .update(plans)
+      .set({ status: "archived", updatedAt: new Date() })
+      .where(and(eq(plans.id, planId), eq(plans.userId, userId), eq(plans.status, "active"))),
+  );
   revalidatePath("/planner");
   revalidatePath("/dashboard");
   return { ok: true };
@@ -113,10 +127,12 @@ export async function archivePlan(planId: string): Promise<Result> {
  * to its tasks and focus sessions. */
 export async function deletePlan(planId: string): Promise<Result> {
   const userId = await requireUserId();
-  const deleted = await db
-    .delete(plans)
-    .where(and(eq(plans.id, planId), eq(plans.userId, userId)))
-    .returning({ id: plans.id });
+  const deleted = await withDbRetry(() =>
+    db
+      .delete(plans)
+      .where(and(eq(plans.id, planId), eq(plans.userId, userId)))
+      .returning({ id: plans.id }),
+  );
   if (!deleted.length) return { ok: false, error: "প্ল্যানটি পাওয়া যায়নি" };
   revalidatePath("/planner");
   revalidatePath("/dashboard");
@@ -126,7 +142,9 @@ export async function deletePlan(planId: string): Promise<Result> {
 /** Repeat a finished/archived cycle: copy it into a fresh draft starting today. */
 export async function duplicatePlan(planId: string): Promise<Result<{ id: string }>> {
   const userId = await requireUserId();
-  const [plan] = await db.select().from(plans).where(and(eq(plans.id, planId), eq(plans.userId, userId)));
+  const [plan] = await withDbRetry(() =>
+    db.select().from(plans).where(and(eq(plans.id, planId), eq(plans.userId, userId))),
+  );
   if (!plan) return { ok: false, error: "প্ল্যানটি পাওয়া যায়নি" };
   const data = { ...plan.planData, startDate: todayIso(), title: `${plan.planData.title} (আবার)`.slice(0, 120) };
   return { ok: true, id: await insertDraft(userId, plan.source, data) };
@@ -138,10 +156,12 @@ async function checkQuota(userId: string): Promise<string | null> {
   const tier = await getUserTier(userId);
   const limit = AI_DAILY_LIMIT[tier];
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const [r] = await db
-    .select({ c: count() })
-    .from(aiUsageLogs)
-    .where(and(eq(aiUsageLogs.userId, userId), gte(aiUsageLogs.createdAt, since)));
+  const [r] = await withDbRetry(() =>
+    db
+      .select({ c: count() })
+      .from(aiUsageLogs)
+      .where(and(eq(aiUsageLogs.userId, userId), gte(aiUsageLogs.createdAt, since))),
+  );
   if (r.c < limit) return null;
   return tier === "free"
     ? `আজকের ফ্রি AI লিমিট (${limit}) শেষ। প্রিমিয়ামে আপগ্রেড করুন অথবা কাল আবার চেষ্টা করুন।`
@@ -150,12 +170,14 @@ async function checkQuota(userId: string): Promise<string | null> {
 
 async function callAi(userId: string, feature: string, args: Parameters<typeof generateJson>[0]) {
   const out = await generateJson(args);
-  await db.insert(aiUsageLogs).values({
-    userId,
-    feature,
-    inputTokens: out.inputTokens,
-    outputTokens: out.outputTokens,
-  });
+  await withDbRetry(() =>
+    db.insert(aiUsageLogs).values({
+      userId,
+      feature,
+      inputTokens: out.inputTokens,
+      outputTokens: out.outputTokens,
+    }),
+  );
   return out.data;
 }
 

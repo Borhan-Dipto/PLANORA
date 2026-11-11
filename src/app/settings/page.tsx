@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import Link from "next/link";
 import { requireUserId } from "@/lib/session";
-import { db } from "@/db/client";
+import { db, withDbRetry } from "@/db/client";
 import { userPreferences, profiles } from "@/db/schema";
 import { getDictionary, getLocale } from "@/lib/i18n";
 import { AppShell } from "@/components/app-shell";
@@ -15,8 +15,8 @@ export default async function SettingsPage() {
   const [dict, locale, [prefs], [profile]] = await Promise.all([
     getDictionary(),
     getLocale(),
-    db.select().from(userPreferences).where(eq(userPreferences.userId, userId)),
-    db.select({ role: profiles.role }).from(profiles).where(eq(profiles.id, userId)),
+    withDbRetry(() => db.select().from(userPreferences).where(eq(userPreferences.userId, userId))),
+    withDbRetry(() => db.select({ role: profiles.role }).from(profiles).where(eq(profiles.id, userId))),
   ]);
   const isAdmin = profile?.role === "admin" || profile?.role === "super_admin";
 

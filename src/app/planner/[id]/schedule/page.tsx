@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { db } from "@/db/client";
+import { db, withDbRetry } from "@/db/client";
 import { plans, planTasks } from "@/db/schema";
 import { requireUserId } from "@/lib/session";
 import { addDays } from "@/lib/plan/schema";
@@ -17,7 +17,7 @@ export default async function SchedulePage({ params }: PageProps<"/planner/[id]/
   const { id } = await params;
   const userId = await requireUserId();
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
-  const [plan] = await db.select().from(plans).where(and(eq(plans.id, id), eq(plans.userId, userId)));
+  const [plan] = await withDbRetry(() => db.select().from(plans).where(and(eq(plans.id, id), eq(plans.userId, userId))));
   if (!plan) notFound();
 
   const d = plan.planData;
@@ -72,7 +72,9 @@ export default async function SchedulePage({ params }: PageProps<"/planner/[id]/
     );
   }
 
-  const rows = await db.select().from(planTasks).where(eq(planTasks.planId, id)).orderBy(planTasks.date, planTasks.sort);
+  const rows = await withDbRetry(() =>
+    db.select().from(planTasks).where(eq(planTasks.planId, id)).orderBy(planTasks.date, planTasks.sort),
+  );
   for (const r of rows) tasksByDate.set(r.date, [...(tasksByDate.get(r.date) ?? []), r]);
   const missed = plan.status === "active" ? await missedCount(id, today) : 0;
 

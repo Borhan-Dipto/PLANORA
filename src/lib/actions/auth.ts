@@ -3,7 +3,7 @@
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { db } from "@/db/client";
+import { db, withDbRetry } from "@/db/client";
 import { profiles } from "@/db/schema";
 import { emailSchema, otpSchema, loginSchema, setPasswordSchema } from "@/lib/validations/auth";
 
@@ -40,7 +40,9 @@ export async function continueLogin(_prev: ActionResult, formData: FormData): Pr
   const { email, password } = parsed.data;
 
   if (!password) {
-    const [profile] = await db.select({ hasPassword: profiles.hasPassword }).from(profiles).where(eq(profiles.email, email));
+    const [profile] = await withDbRetry(() =>
+      db.select({ hasPassword: profiles.hasPassword }).from(profiles).where(eq(profiles.email, email)),
+    );
     if (profile?.hasPassword) return { step: "password", email };
 
     const supabase = await createClient();
@@ -103,7 +105,7 @@ export async function setNewPassword(_prev: ActionResult, formData: FormData): P
   const { error } = await supabase.auth.updateUser({ password: parsed.data.password });
   if (error) return { error: "পাসওয়ার্ড সেট করা যায়নি। আবার চেষ্টা করুন।" };
 
-  await db.update(profiles).set({ hasPassword: true }).where(eq(profiles.id, userData.user.id));
+  await withDbRetry(() => db.update(profiles).set({ hasPassword: true }).where(eq(profiles.id, userData.user.id)));
 
   redirect("/dashboard");
 }

@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
-import { db } from "@/db/client";
+import { db, withDbRetry } from "@/db/client";
 import { plans } from "@/db/schema";
 import { requireUserId } from "@/lib/session";
 import { analyzePlan } from "@/lib/plan/schema";
@@ -16,7 +16,7 @@ export default async function PlanPreviewPage({ params }: PageProps<"/planner/[i
   const { id } = await params;
   const userId = await requireUserId();
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
-  const [plan] = await db.select().from(plans).where(and(eq(plans.id, id), eq(plans.userId, userId)));
+  const [plan] = await withDbRetry(() => db.select().from(plans).where(and(eq(plans.id, id), eq(plans.userId, userId))));
   if (!plan) notFound();
 
   // Normalize once here: a plan row saved by an older/different code path (or a partially-failed
