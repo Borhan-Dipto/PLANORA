@@ -13,6 +13,10 @@ export const profiles = pgTable("profiles", {
   phone: text("phone"), // denormalized copy of verified phone, for display/admin search only
   role: appRoleEnum("role").notNull().default("user"),
   isSuspended: boolean("is_suspended").notNull().default(false),
+  // true once the user has set a password (via /set-password, right after their first/recovery
+  // OTP verification). Lets /login decide: known email + has_password -> ask for the password
+  // directly; otherwise -> send a fresh OTP code (first signup, or password not set yet).
+  hasPassword: boolean("has_password").notNull().default(false),
   timezone: text("timezone").notNull().default("Asia/Dhaka"),
   locale: text("locale").notNull().default("bn"), // "bn" | "en"
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
