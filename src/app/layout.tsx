@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { ThemeProvider } from "@/components/theme-provider";
+import { ServiceWorkerRegister } from "@/components/sw-register";
 // Self-hosted (via @fontsource, no Google Fonts network fetch at build/runtime). Hind Siliguri is a
 // clean, modern Bengali + Latin face used for all app copy — carries most of the "premium" feel
 // since nearly every screen is Bangla text. Outfit is a geometric, premium Latin display face
@@ -40,6 +41,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <ThemeProvider attribute="data-theme" defaultTheme="system" enableSystem>
           {children}
         </ThemeProvider>
+        <ServiceWorkerRegister />
       </body>
     </html>
   );
