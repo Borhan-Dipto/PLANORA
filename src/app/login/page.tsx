@@ -15,7 +15,7 @@ export default function LoginPage() {
       <form action={action} className={`${ui.card} space-y-4 shadow-[0_8px_24px_rgba(16,24,40,0.08)]`}>
         <div>
           <h1 className="text-xl font-semibold">লগইন করুন বা নতুন অ্যাকাউন্ট খুলুন</h1>
-          <p className="mt-1 text-sm text-muted">
+          <p key={showPassword ? "pw" : "email"} className="mt-1 text-sm text-muted animate-field-in">
             {showPassword
               ? "এই ইমেইলে আগে থেকেই পাসওয়ার্ড সেট করা আছে — পাসওয়ার্ড দিয়ে লগইন করুন।"
               : "ইমেইল দিন — নতুন হলে একটা কোড পাঠাব, আগে থেকে পাসওয়ার্ড সেট থাকলে সরাসরি পাসওয়ার্ড চাইব।"}
@@ -38,7 +38,7 @@ export default function LoginPage() {
           />
         </div>
         {showPassword && (
-          <div>
+          <div className="animate-field-in">
             <label htmlFor="password" className={ui.label}>
               পাসওয়ার্ড
             </label>
