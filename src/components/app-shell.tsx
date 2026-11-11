@@ -80,7 +80,7 @@ export function AppShell({
 
         {/* Mobile bottom nav — grid (not flex) so every item, including Settings, always has its own slot and never gets clipped */}
         <nav
-          className="fixed inset-x-0 bottom-0 z-20 grid border-t border-border bg-surface/95 py-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))] backdrop-blur md:hidden"
+          className="fixed inset-x-0 bottom-0 z-20 grid gap-0.5 border-t border-border bg-surface/95 p-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_-12px_rgba(16,24,40,0.18)] backdrop-blur md:hidden"
           style={{ gridTemplateColumns: `repeat(${NAV_ITEMS.length + 1}, minmax(0, 1fr))` }}
         >
           {[...NAV_ITEMS, SETTINGS_ITEM].map((item) => {
@@ -90,10 +90,15 @@ export function AppShell({
                 key={item.href}
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className={`flex min-w-0 flex-col items-center gap-0.5 px-0.5 ${active ? "text-accent" : "text-muted"}`}
+                className={`relative flex min-w-0 flex-col items-center gap-0.5 rounded-xl px-0.5 py-1.5 transition-colors ${
+                  active ? "bg-accent/10 text-accent" : "text-muted hover:bg-background hover:text-foreground"
+                }`}
               >
-                <span className="text-base leading-none">{item.icon}</span>
-                <span className="w-full truncate text-center text-[10px] leading-tight font-medium">{dict.nav[item.key]}</span>
+                {active && (
+                  <span className="absolute -top-[7px] h-[3px] w-5 rounded-full bg-accent" aria-hidden />
+                )}
+                <span className={`text-base leading-none transition-transform ${active ? "scale-110" : ""}`}>{item.icon}</span>
+                <span className="w-full truncate text-center text-[10px] leading-tight font-semibold">{dict.nav[item.key]}</span>
               </Link>
             );
           })}
