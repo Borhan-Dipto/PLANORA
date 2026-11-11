@@ -1,7 +1,6 @@
 "use server";
 
 import { and, eq, sql } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 import { db, withDbRetry } from "@/db/client";
 import { focusSessions, planTasks } from "@/db/schema";
 import { requireUserId } from "@/lib/session";
@@ -99,8 +98,13 @@ export async function completeFocusSession(sessionId: string) {
   if (session.taskId) {
     await db.update(planTasks).set({ status: "done", completedAt: endedAt }).where(eq(planTasks.id, session.taskId));
   }
-  revalidatePath("/dashboard");
-  revalidatePath(`/planner/${session.planId}/schedule`);
+  // Deliberately no revalidatePath() here: this action runs while the client is still on
+  // /focus/[taskId]. Next.js bundles any revalidatePath-triggered revalidation into THIS same
+  // response as an implicit re-render of the CURRENTLY VIEWED route (not just the revalidated
+  // path) — which would re-run that page's own startFocusSession(taskId) check server-side right
+  // after this update, see it as no-longer-pending, and call notFound() before the client ever
+  // gets to show the "সম্পন্ন!" screen. The dashboard/schedule pages read via requireUserId()
+  // (dynamic, uncached), so they already render fresh data on the next real navigation without needing revalidation here.
   return { ok: true as const, actualMinutes, targetMinutes: session.targetMinutes };
 }
 
@@ -110,6 +114,6 @@ export async function emergencyExitFocusSession(sessionId: string, reason: strin
     .update(focusSessions)
     .set({ status: "exited", endedAt: new Date(), exitReason: reason.slice(0, 300) || "কারণ দেওয়া হয়নি" })
     .where(and(eq(focusSessions.id, sessionId), eq(focusSessions.userId, userId), eq(focusSessions.status, "active")));
-  revalidatePath("/dashboard");
+  // Same reason as completeFocusSession above: no revalidatePath while still on /focus/[taskId].
   return { ok: true as const };
 }

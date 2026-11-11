@@ -202,8 +202,8 @@ export function FocusScreen({ session }: { session: ActiveSession }) {
 
   return (
     <FocusShell>
-      <div className="flex w-full max-w-sm flex-col items-center gap-1 text-center landscape:max-w-3xl landscape:flex-row landscape:justify-center landscape:gap-10 landscape:text-left">
-        <div className="landscape:order-2 landscape:flex-1">
+      <div className="flex w-full max-w-sm flex-col items-center gap-1 text-center landscape:grid landscape:max-w-5xl landscape:grid-cols-[1fr_auto_1fr] landscape:items-center landscape:gap-10 landscape:text-left">
+        <div className="landscape:col-start-1 landscape:row-start-1 landscape:justify-self-end">
           {session.subjectName && <p className="text-sm font-medium text-slate-400">{session.subjectName}</p>}
           <h1 className="mb-6 line-clamp-2 px-4 text-lg font-semibold text-white landscape:px-0 landscape:mb-4">{session.title}</h1>
 
@@ -218,7 +218,7 @@ export function FocusScreen({ session }: { session: ActiveSession }) {
           <div className="mt-8 flex w-full flex-col gap-3 landscape:max-w-xs">
             <button
               onClick={finish}
-              className="rounded-full bg-success px-6 py-3.5 font-semibold text-white transition-transform active:scale-95"
+              className="rounded-full border border-slate-700 bg-[#0A0E14] px-6 py-3.5 font-semibold text-white transition-transform active:scale-95"
             >
               ✓ পড়া শেষ করেছি
             </button>
@@ -232,7 +232,7 @@ export function FocusScreen({ session }: { session: ActiveSession }) {
         </div>
 
         {/* Ring + time — the main highlight, enlarged whenever the phone is in landscape. */}
-        <div className="relative flex h-64 w-64 shrink-0 items-center justify-center landscape:order-1 landscape:h-72 landscape:w-72">
+        <div className="relative flex h-64 w-64 shrink-0 items-center justify-center landscape:col-start-2 landscape:row-start-1 landscape:h-72 landscape:w-72">
           {/* Ambient "breathing" glow behind the ring — a quiet sign the screen is alive, not static. */}
           <div className={`absolute h-48 w-48 rounded-full ${glowClass} blur-3xl transition-colors duration-1000 landscape:h-56 landscape:w-56`} style={{ animation: "focus-breathe 4s ease-in-out infinite" }} />
 
