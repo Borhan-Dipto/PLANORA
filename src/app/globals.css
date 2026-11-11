@@ -1,30 +1,22 @@
 @import "tailwindcss";
 
-:root {
-  --font-hind: "Hind Siliguri";
-  --font-space: "Space Grotesk";
-  --background: #F7F8FA;
-  --surface: #FFFFFF;
-  --foreground: #111827;
-  --muted: #667085;
-  --border: #E5E7EB;
-  --accent: #2563EB;
-  --accent-foreground: #FFFFFF;
-  --success: #16A34A;
-  --warning: #D97706;
-  --error: #DC2626;
-}
-
+/* "Warm Charcoal" — PLANORA's one house theme: deep charcoal surfaces with a warm amber accent.
+   Used for both the default and the explicit "dark" choice, so the theme toggle still works but
+   never leaves this palette — this is the chosen look everywhere, not just a dark mode. */
+:root,
 :root[data-theme="dark"] {
-  --background: #0B0D10;
-  --surface: #15191F;
-  --surface-elevated: #1C222B;
-  --foreground: #F5F7FA;
-  --muted: #9AA4B2;
-  --border: #2A303A;
-  --accent: #60A5FA;
-  --accent-foreground: #0B0D10;
-  --success: #22C55E;
+  --font-hind: "Hind Siliguri";
+  --font-space: "Outfit";
+  --background: #15161A;
+  --surface: #1E2025;
+  --surface-elevated: #262930;
+  --foreground: #F2F1EC;
+  --muted: #9A978E;
+  --border: #2E3036;
+  --accent: #E0A039;
+  --accent-light: #EDB45B;
+  --accent-foreground: #15161A;
+  --success: #4ADE80;
   --warning: #FBBF24;
   --error: #F87171;
 }
@@ -36,6 +28,8 @@
   --color-muted: var(--muted);
   --color-border: var(--border);
   --color-accent: var(--accent);
+  --color-accent-light: var(--accent-light);
+  --color-surface-elevated: var(--surface-elevated);
   --color-accent-foreground: var(--accent-foreground);
   --color-success: var(--success);
   --color-warning: var(--warning);
@@ -91,6 +85,10 @@ button:active:not(:disabled) {
 @keyframes drift-glow {
   0%, 100% { transform: translate(0, 0) scale(1); }
   50% { transform: translate(-3%, 4%) scale(1.06); }
+}
+@keyframes logo-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
 }
 @media (prefers-reduced-motion: reduce) {
   .auth-scene * {

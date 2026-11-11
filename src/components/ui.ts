@@ -6,7 +6,7 @@ export const ui = {
   label: "mb-1 block text-xs font-medium text-muted",
   btn: "inline-flex items-center justify-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-semibold tracking-[0.01em] disabled:cursor-not-allowed disabled:opacity-50",
   primary:
-    "bg-[linear-gradient(180deg,color-mix(in_srgb,var(--accent)_85%,white),var(--accent))] text-accent-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_1px_2px_rgba(16,24,40,0.08),0_10px_20px_-10px_var(--accent)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_1px_2px_rgba(16,24,40,0.08),0_14px_24px_-10px_var(--accent)] hover:-translate-y-px",
+    "bg-[linear-gradient(180deg,var(--accent-light),var(--accent))] text-accent-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_1px_2px_rgba(16,24,40,0.08),0_10px_20px_-10px_var(--accent)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_1px_2px_rgba(16,24,40,0.08),0_14px_24px_-10px_var(--accent)] hover:-translate-y-px",
   secondary:
     "border border-border bg-surface text-foreground shadow-[0_1px_2px_rgba(16,24,40,0.04)] hover:border-accent/50 hover:bg-background hover:-translate-y-px",
   danger: "border border-error/40 text-error hover:bg-error/10",
