@@ -97,6 +97,28 @@ button:active:not(:disabled) {
 .animate-field-in {
   animation: field-in 220ms ease-out;
 }
+
+/* Premium button sheen: a soft diagonal highlight that sweeps across on hover (desktop) or on
+   press (:active — fires on tap, so phones get the same cue). Layered on top of ui.primary /
+   ui.secondary's own gradient + shadow via the "btn-shine" class; purely decorative, so it's
+   pointer-events:none and doesn't affect layout or hit-testing. */
+.btn-shine {
+  position: relative;
+  overflow: hidden;
+}
+.btn-shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.4) 50%, transparent 65%);
+  transform: translateX(-130%);
+  transition: transform 650ms ease;
+  pointer-events: none;
+}
+.btn-shine:hover::after,
+.btn-shine:active::after {
+  transform: translateX(130%);
+}
 @media (prefers-reduced-motion: reduce) {
   .auth-scene * {
     animation: none !important;

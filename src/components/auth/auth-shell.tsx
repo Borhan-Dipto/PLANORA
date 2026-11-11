@@ -13,21 +13,14 @@ const RING_CIRCUMFERENCE = 94;
 const RING_TARGET_OFFSET = 24; // ~75% filled
 const STREAK_TARGET = 12;
 
-/** A floating, 3D-tilted planner scene: three depth-layered cards (calendar, checklist,
- * progress ring) built with CSS perspective/translateZ — the "planning" visual the marketing
- * panel is built around. Two layers of motion: the cards' own gentle float (CSS keyframes,
- * always on) plus a cursor-driven parallax tilt on the whole scene (mouse position → rotateX/Y
- * on an outer wrapper, separate element from the cards so the two transforms never collide) —
- * and on mount, the streak number counts up and the progress ring draws in instead of just
- * appearing static. */
-function PlannerScene() {
-  const sceneRef = useRef<HTMLDivElement>(null);
-  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+/** Counts a number up with ease-out, and flags when the mount-in transition should start —
+ * shared by the desktop scene's front card and the mobile standalone card so both animate in
+ * the same way instead of just appearing already-finished. */
+function useAnimateIn() {
   const [animateIn, setAnimateIn] = useState(false);
   const [streak, setStreak] = useState(0);
 
   useEffect(() => {
-    // Kick the draw-in/count-up a tick after mount so the transition is visible.
     const t = setTimeout(() => setAnimateIn(true), 150);
     return () => clearTimeout(t);
   }, []);
@@ -45,6 +38,53 @@ function PlannerScene() {
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [animateIn]);
+
+  return { animateIn, streak };
+}
+
+/** The streak + progress-ring card by itself — used both as the desktop scene's front card and
+ * (full-size, touch-tilted) as the mobile standalone card. */
+function StreakCard({ animateIn, streak, className = "" }: { animateIn: boolean; streak: number; className?: string }) {
+  return (
+    <div
+      className={`flex h-28 w-44 flex-col justify-between rounded-2xl border border-border bg-surface p-3.5 shadow-2xl ${className}`}
+      style={{ transformStyle: "preserve-3d" }}
+    >
+      <div className="flex items-center gap-1.5">
+        <span className="text-base">🔥</span>
+        <span className="text-sm font-bold">{streak} দিন স্ট্রিক</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <svg width="30" height="30" viewBox="0 0 36 36" className="shrink-0 -rotate-90">
+          <circle cx="18" cy="18" r="15" fill="none" stroke="var(--border)" strokeWidth="4" />
+          <circle
+            cx="18"
+            cy="18"
+            r="15"
+            fill="none"
+            stroke="var(--accent)"
+            strokeWidth="4"
+            strokeDasharray={RING_CIRCUMFERENCE}
+            strokeDashoffset={animateIn ? RING_TARGET_OFFSET : RING_CIRCUMFERENCE}
+            strokeLinecap="round"
+            className="transition-[stroke-dashoffset] duration-1000 ease-out"
+          />
+        </svg>
+        <span className="text-[11px] text-muted">৭৫% সম্পন্ন</span>
+      </div>
+    </div>
+  );
+}
+
+/** A floating, 3D-tilted planner scene: three depth-layered cards (calendar, checklist,
+ * progress ring) built with CSS perspective/translateZ — the "planning" visual the marketing
+ * panel is built around. Two layers of motion: the cards' own gentle float (CSS keyframes,
+ * always on) plus a cursor-driven parallax tilt on the whole scene (mouse position → rotateX/Y
+ * on an outer wrapper, separate element from the cards so the two transforms never collide). */
+function PlannerScene() {
+  const sceneRef = useRef<HTMLDivElement>(null);
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+  const { animateIn, streak } = useAnimateIn();
 
   function handleMouseMove(e: React.MouseEvent<HTMLDivElement>) {
     const rect = sceneRef.current?.getBoundingClientRect();
@@ -132,37 +172,52 @@ function PlannerScene() {
           </div>
         </div>
 
-        {/* Front card — streak + progress ring, animates in on mount, floats closest to viewer */}
-        <div
-          className="absolute left-10 top-0 flex h-28 w-44 flex-col justify-between rounded-2xl border border-border bg-surface p-3.5 shadow-2xl"
-          style={{
-            transformStyle: "preserve-3d",
-            animation: "float-a 6s ease-in-out infinite",
-          }}
-        >
-          <div className="flex items-center gap-1.5">
-            <span className="text-base">🔥</span>
-            <span className="text-sm font-bold">{streak} দিন স্ট্রিক</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <svg width="30" height="30" viewBox="0 0 36 36" className="shrink-0 -rotate-90">
-              <circle cx="18" cy="18" r="15" fill="none" stroke="var(--border)" strokeWidth="4" />
-              <circle
-                cx="18"
-                cy="18"
-                r="15"
-                fill="none"
-                stroke="var(--accent)"
-                strokeWidth="4"
-                strokeDasharray={RING_CIRCUMFERENCE}
-                strokeDashoffset={animateIn ? RING_TARGET_OFFSET : RING_CIRCUMFERENCE}
-                strokeLinecap="round"
-                className="transition-[stroke-dashoffset] duration-1000 ease-out"
-              />
-            </svg>
-            <span className="text-[11px] text-muted">৭৫% সম্পন্ন</span>
-          </div>
+        {/* Front card, floats closest to viewer */}
+        <div className="absolute left-10 top-0" style={{ animation: "float-a 6s ease-in-out infinite" }}>
+          <StreakCard animateIn={animateIn} streak={streak} />
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** Mobile/tablet counterpart to the desktop PlannerScene — there's no cursor to drive a tilt, so
+ * this responds to touch instead: a finger dragged across the card tilts it the same way the
+ * mouse does on desktop, and it springs back to flat on release. Shown above the form on small
+ * screens so phone users (most of PLANORA's actual traffic) get the same "alive" feel, not just
+ * a flat form — previously this whole scene was `hidden` below the `lg` breakpoint. */
+function MobileStreakCard() {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+  const { animateIn, streak } = useAnimateIn();
+
+  function handleTouchMove(e: React.TouchEvent<HTMLDivElement>) {
+    const rect = cardRef.current?.getBoundingClientRect();
+    const touch = e.touches[0];
+    if (!rect || !touch) return;
+    const px = (touch.clientX - rect.left) / rect.width - 0.5;
+    const py = (touch.clientY - rect.top) / rect.height - 0.5;
+    setTilt({ x: py * -12, y: px * 16 });
+  }
+
+  return (
+    <div className="relative mx-auto mb-6 h-32 w-48 [perspective:900px] lg:hidden">
+      <div
+        aria-hidden
+        className="absolute inset-0 -z-10 opacity-60 blur-2xl"
+        style={{
+          background: "radial-gradient(60% 60% at 50% 50%, color-mix(in srgb, var(--accent) 35%, transparent), transparent)",
+          animation: "drift-glow 9s ease-in-out infinite",
+        }}
+      />
+      <div
+        ref={cardRef}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={() => setTilt({ x: 0, y: 0 })}
+        className="transition-transform duration-300 ease-out [animation:float-a_6s_ease-in-out_infinite]"
+        style={{ transformStyle: "preserve-3d", transform: `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)` }}
+      >
+        <StreakCard animateIn={animateIn} streak={streak} className="mx-auto w-48" />
       </div>
     </div>
   );
@@ -170,7 +225,7 @@ function PlannerScene() {
 
 /** Shared full-bleed auth layout for /login (covers signup too — same passwordless flow) and
  * /verify: a marketing panel with a 3D planner scene on wide screens, brand mark + the form
- * card everywhere. */
+ * card everywhere, and the touch-tiltable streak card on phones/tablets. */
 export function AuthShell({ children }: { children: React.ReactNode }) {
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background p-6">
@@ -217,6 +272,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
             <Logomark className="h-9 w-9 shrink-0 drop-shadow-[0_3px_8px_rgba(37,99,235,0.4)]" />
             <span className="font-brand text-xl font-bold tracking-tight">PLANORA</span>
           </div>
+          <MobileStreakCard />
           {children}
         </div>
       </div>
