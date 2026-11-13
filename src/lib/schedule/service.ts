@@ -90,19 +90,23 @@ export async function regenerateSchedule(planId: string, userId: string, plan: P
 }
 
 /**
- * Marks the next `days` calendar days (starting `today`) as a break: those dates show "বিরতি"
- * instead of the normal routine, and everything scheduled after them shifts back by exactly
- * `days` days — nothing else about the plan changes. Relies on two existing mechanisms rather
- * than adding new ones: `plan.breakDates` already extends learningEnd/cycleEnd (see
- * schedule/engine.ts), and inserting these rows with `locked: true` makes regenerateSchedule's
- * own `lockedDates` query (below) skip them automatically, exactly like a manually-fixed day.
- * Caller (the server action) is responsible for the access gate (super_admin-only for now).
+ * Marks `days` calendar days starting at `startDate` (today, or any present/future date — the
+ * caller may let the user pick "today", "tomorrow", or an explicit calendar range) as a break:
+ * those dates show "বিরতি" instead of the normal routine, and everything scheduled after them
+ * shifts back by exactly `days` days — nothing else about the plan changes. Relies on two
+ * existing mechanisms rather than adding new ones: `plan.breakDates` already extends
+ * learningEnd/cycleEnd (see schedule/engine.ts), and inserting these rows with `locked: true`
+ * makes regenerateSchedule's own `lockedDates` query (below) skip them automatically, exactly
+ * like a manually-fixed day. `today` is still needed separately — it's where regenerateSchedule
+ * rebuilds *from*, which stays "today" even when the break itself starts later.
+ * Caller (the server action) is responsible for the access gate (super_admin-only for now) and
+ * for validating startDate/days (e.g. startDate must not be in the past).
  */
-export async function takeBreak(planId: string, userId: string, plan: PlanData, today: string, days: number) {
+export async function takeBreak(planId: string, userId: string, plan: PlanData, today: string, startDate: string, days: number) {
   const existing = new Set(plan.breakDates ?? []);
   const newDates: string[] = [];
   for (let i = 0; i < days; i++) {
-    const d = addDays(today, i);
+    const d = addDays(startDate, i);
     if (!existing.has(d)) newDates.push(d);
   }
   const breakDates = [...existing, ...newDates].sort();

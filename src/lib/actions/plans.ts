@@ -135,19 +135,23 @@ export async function approvePlan(planId: string): Promise<Result> {
 }
 
 const MAX_BREAK_DAYS = 60;
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
- * Pauses the active plan's whole routine for `days` calendar days starting today, then shifts
- * everything after it back by exactly that many days — nothing else changes. Super_admin-only
- * for now (not yet opened to paying premium users); gated the same single-line way as
- * resolveLearningDays above, so opening it to premium later is a one-line change here.
+ * Pauses the active plan's whole routine for every day from `startDate` through `endDate`
+ * (inclusive), then shifts everything after it back by exactly that many days — nothing else
+ * changes. `startDate`/`endDate` cover all three ways the UI lets the user say "when": "আজ থেকে"
+ * and "আগামীকাল থেকে" are just today/tomorrow with `endDate` computed from a day-count, and
+ * picking an explicit calendar range ("৫ তারিখ থেকে ১০ তারিখ") passes both directly — this one
+ * action handles all of them. Super_admin-only for now (not yet opened to paying premium users);
+ * gated the same single-line way as resolveLearningDays above, so opening it to premium later is
+ * a one-line change here.
  */
-export async function takeBreak(planId: string, days: number): Promise<Result> {
+export async function takeBreak(planId: string, startDate: string, endDate: string): Promise<Result> {
   const userId = await requireUserId();
   if (!(await isSuperAdmin(userId))) return { ok: false, error: "এই ফিচারটি এখনো শুধু সুপার অ্যাডমিনের জন্য" };
-  const n = Math.round(days);
-  if (!Number.isFinite(n) || n < 1 || n > MAX_BREAK_DAYS)
-    return { ok: false, error: `ব্রেক ১ থেকে ${MAX_BREAK_DAYS} দিনের মধ্যে হতে হবে` };
+  if (!ISO_DATE_RE.test(startDate) || !ISO_DATE_RE.test(endDate)) return { ok: false, error: "তারিখ সঠিক নয়" };
+  if (endDate < startDate) return { ok: false, error: "শেষের তারিখ শুরুর তারিখের আগে হতে পারবে না" };
 
   const [plan] = await withDbRetry(() =>
     db.select().from(plans).where(and(eq(plans.id, planId), eq(plans.userId, userId))),
@@ -155,9 +159,16 @@ export async function takeBreak(planId: string, days: number): Promise<Result> {
   if (!plan || plan.status !== "active") return { ok: false, error: "চলমান প্ল্যান পাওয়া যায়নি" };
 
   const today = await todayFor(userId);
-  await takeBreakSchedule(planId, userId, plan.planData, today, n);
+  if (startDate < today) return { ok: false, error: "অতীতের কোনো তারিখে ব্রেক দেওয়া যাবে না" };
+  if (startDate > cycleEnd(plan.planData)) return { ok: false, error: "এই তারিখ প্ল্যানের মেয়াদের বাইরে" };
+
+  const days = Math.round((Date.parse(endDate) - Date.parse(startDate)) / 86_400_000) + 1;
+  if (days > MAX_BREAK_DAYS) return { ok: false, error: `একসাথে সর্বোচ্চ ${MAX_BREAK_DAYS} দিন ব্রেক নেওয়া যাবে` };
+
+  await takeBreakSchedule(planId, userId, plan.planData, today, startDate, days);
   revalidatePath("/dashboard");
   revalidatePath(`/planner/${planId}/schedule`);
+  revalidatePath("/planner/day");
   return { ok: true };
 }
 

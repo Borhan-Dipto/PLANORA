@@ -122,7 +122,7 @@ export default async function DashboardPage() {
           </Link>
         )}
 
-        {!notStarted && superAdmin && <TakeBreakButton planId={active.id} />}
+        {!notStarted && superAdmin && <TakeBreakButton planId={active.id} today={today} />}
 
         <section className={ui.card}>
           <h2 className="mb-3 font-semibold">আজকের পড়ার তালিকা</h2>
