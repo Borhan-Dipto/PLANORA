@@ -8,6 +8,8 @@ import {
   newId,
   MIN_REVISION_DAYS,
   MAX_REVISION_DAYS,
+  MIN_LEARNING_DAYS,
+  MAX_LEARNING_DAYS,
   type PlanData,
   type Subject,
   type Topic,
@@ -18,11 +20,20 @@ import { JsonImport } from "@/components/planner/json-import";
 
 type Source = "manual" | "ai_chat" | "automatic";
 
+const LEARNING_DAYS_PRESETS = [
+  { days: 10, label: "১০ দিন" },
+  { days: 15, label: "১৫ দিন" },
+  { days: 30, label: "৩০ দিন (১ মাস)" },
+  { days: 60, label: "৬০ দিন (২ মাস)" },
+  { days: 90, label: "৯০ দিন (৩ মাস)" },
+];
+
 export function PlanEditor({
   initial,
   planId,
   source,
   isPremium,
+  isSuperAdmin = false,
   active = false,
   todayIso,
 }: {
@@ -30,6 +41,8 @@ export function PlanEditor({
   planId: string | null;
   source: Source;
   isPremium: boolean;
+  /** Custom plan duration (learningDays) is a super_admin-only capability for now. */
+  isSuperAdmin?: boolean;
   active?: boolean;
   /** Today's date (user's timezone) — active plans may only move their start date to today or later. */
   todayIso?: string;
@@ -75,7 +88,11 @@ export function PlanEditor({
       )}
       <JsonImport
         onImport={(imported) =>
-          setPlan((p) => ({ ...imported, revisionDays: isPremium ? imported.revisionDays : p.revisionDays }))
+          setPlan((p) => ({
+            ...imported,
+            revisionDays: isPremium ? imported.revisionDays : p.revisionDays,
+            learningDays: isSuperAdmin ? imported.learningDays : p.learningDays,
+          }))
         }
       />
 
@@ -133,6 +150,44 @@ export function PlanEditor({
               onChange={(e) => set("dailyStudyMinutes", Math.round(Number(e.target.value || 0) * 60))}
             />
           </div>
+          {isSuperAdmin && (
+            <div className="sm:col-span-2">
+              <label className={ui.label}>
+                প্ল্যানের মেয়াদ (দিন) <span className="ml-1 rounded bg-accent/15 px-1.5 text-accent">সুপার অ্যাডমিন</span>
+              </label>
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {LEARNING_DAYS_PRESETS.map((p) => (
+                  <button
+                    key={p.days}
+                    type="button"
+                    onClick={() => set("learningDays", p.days)}
+                    className={`rounded-full border px-3 py-1 text-xs ${
+                      plan.learningDays === p.days
+                        ? "border-accent bg-accent text-accent-foreground"
+                        : "border-border text-muted hover:text-foreground"
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={MIN_LEARNING_DAYS}
+                max={MAX_LEARNING_DAYS}
+                step={1}
+                className={`${ui.input} max-w-40`}
+                value={plan.learningDays}
+                onChange={(e) =>
+                  set("learningDays", Math.min(MAX_LEARNING_DAYS, Math.max(MIN_LEARNING_DAYS, Number(e.target.value) || MIN_LEARNING_DAYS)))
+                }
+              />
+              <p className="mt-1 text-xs text-muted">
+                কাস্টম সংখ্যা দিন ({MIN_LEARNING_DAYS}–{MAX_LEARNING_DAYS} দিন), অথবা উপরের একটা বেছে নিন।
+              </p>
+            </div>
+          )}
           <div>
             <label className={ui.label}>
               রিভিশনের দিন {!isPremium && <span className="ml-1 rounded bg-warning/15 px-1.5 text-warning">Premium-এ ৩–১০</span>}
@@ -178,7 +233,8 @@ export function PlanEditor({
           </div>
         </div>
         <p className="mt-4 text-xs text-muted">
-          সাইকেল: ৩০ দিন পড়া + {plan.revisionDays} দিন রিভিশন = মোট {30 + plan.revisionDays} দিন (শেষ: {stats.endDate})
+          সাইকেল: {plan.learningDays} দিন পড়া + {plan.revisionDays} দিন রিভিশন = মোট {plan.learningDays + plan.revisionDays} দিন
+          (শেষ: {stats.endDate})
         </p>
       </section>
 

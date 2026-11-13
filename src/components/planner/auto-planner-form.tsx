@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { autoGeneratePlan } from "@/lib/actions/plans";
 import { ui } from "@/components/ui";
 
-export function AutoPlannerForm() {
+export function AutoPlannerForm({ learningDays }: { learningDays?: number }) {
   const router = useRouter();
   const EXAMS = ["বিসিএস প্রিলিমিনারি", "বিসিএস লিখিত", "ব্যাংক জব", "প্রাইমারি শিক্ষক", "NTRCA", "বিশ্ববিদ্যালয় সেমিস্টার", "বিশ্ববিদ্যালয় ভর্তি", "মেডিকেল ভর্তি", "HSC", "SSC"];
 
@@ -23,6 +23,7 @@ export function AutoPlannerForm() {
         examDate: f.examDate,
         dailyStudyMinutes: Math.round(f.hours * 60),
         notes: f.notes,
+        learningDays,
       });
       if (!res.ok) return setError(res.error);
       router.push(`/planner/${res.id}`);
@@ -31,6 +32,9 @@ export function AutoPlannerForm() {
 
   return (
     <form onSubmit={submit} className={`${ui.card} space-y-4`}>
+      {learningDays && learningDays !== 30 && (
+        <p className="rounded-lg border border-accent/30 bg-accent/10 p-2 text-sm">মেয়াদ নির্বাচন করা হয়েছে: {learningDays} দিন</p>
+      )}
       <div>
         <label className={ui.label}>কোন পরীক্ষার প্রস্তুতি?</label>
         <div className="mb-2 flex flex-wrap gap-1.5">

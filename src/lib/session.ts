@@ -42,3 +42,13 @@ export async function requireSuperAdminId(): Promise<{ userId: string }> {
   if (!profile || profile.role !== "super_admin") redirect("/dashboard");
   return { userId };
 }
+
+/** Non-redirecting check: true iff this user's role is exactly super_admin. For conditionally
+ * showing/allowing a super_admin-only capability (e.g. custom plan duration) without gating the
+ * whole page behind requireSuperAdminId's redirect. */
+export async function isSuperAdmin(userId: string): Promise<boolean> {
+  const [profile] = await withDbRetry(() =>
+    db.select({ role: profiles.role }).from(profiles).where(eq(profiles.id, userId)),
+  );
+  return profile?.role === "super_admin";
+}

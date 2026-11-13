@@ -33,7 +33,7 @@ export default async function RevisionPage() {
     return (
       <PageFrame title="রিভিশন">
         <div className={`${ui.card} text-center text-muted`}>
-          <p>🔁 রিভিশন শুরু হবে {addOneDay(lEnd)} তারিখে — আগে শেখার ৩০ দিন শেষ করুন।</p>
+          <p>🔁 রিভিশন শুরু হবে {addOneDay(lEnd)} তারিখে — আগে শেখার {plan.learningDays} দিন শেষ করুন।</p>
           <Link href="/dashboard" className={`${ui.btn} ${ui.primary} mt-4`}>
             আজকের পড়ায় ফিরুন
           </Link>

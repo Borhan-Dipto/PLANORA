@@ -4,12 +4,22 @@ import { and, eq, gte, count, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db, withDbRetry } from "@/db/client";
 import { plans, aiUsageLogs } from "@/db/schema";
-import { requireUserId } from "@/lib/session";
-import { analyzePlan, planDataSchema, FREE_REVISION_DAYS, todayIso, type PlanData } from "@/lib/plan/schema";
+import { requireUserId, isSuperAdmin } from "@/lib/session";
+import {
+  analyzePlan,
+  planDataSchema,
+  FREE_REVISION_DAYS,
+  LEARNING_DAYS,
+  MIN_LEARNING_DAYS,
+  MAX_LEARNING_DAYS,
+  todayIso,
+  type PlanData,
+} from "@/lib/plan/schema";
 import { aiDraftSchema, chatTurnSchema, draftToPlan, type AiDraft } from "@/lib/plan/draft";
 import { AiError, chatResponseSchema, draftResponseSchema, generateJson, type GeminiContent } from "@/lib/ai/gemini";
 import { getUserTier, AI_DAILY_LIMIT } from "@/lib/plan/tier";
 import { regenerateSchedule, todayFor } from "@/lib/schedule/service";
+import { cycleEnd } from "@/lib/schedule/engine";
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 type Source = "manual" | "ai_chat" | "automatic";
@@ -18,9 +28,20 @@ async function normalise(userId: string, input: unknown): Promise<Result<{ data:
   const parsed = planDataSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "তথ্য সঠিক নয়" };
   const data = parsed.data;
-  // Free users: fixed 3 revision days. Premium: 3–10 (enforced by schema).
+  // Free users: fixed 3 revision days (premium: 3–10, enforced by schema).
   if ((await getUserTier(userId)) === "free") data.revisionDays = FREE_REVISION_DAYS;
+  // Custom learning-period length is a super_admin-only capability for now (not yet opened to
+  // paying premium users) — anyone else is forced back to the fixed default, re-asserted here so
+  // a request crafted directly against the server action can't bypass the UI gate.
+  if (!(await isSuperAdmin(userId))) data.learningDays = LEARNING_DAYS;
   return { ok: true, data };
+}
+
+/** Clamps a requested learning-period length to the allowed range, and to the fixed default
+ * unless the caller is the super_admin — the single gate every plan-creation path funnels through. */
+async function resolveLearningDays(userId: string, requested: number | undefined): Promise<number> {
+  if (!requested || !(await isSuperAdmin(userId))) return LEARNING_DAYS;
+  return Math.min(MAX_LEARNING_DAYS, Math.max(MIN_LEARNING_DAYS, Math.round(requested)));
 }
 
 async function insertDraft(userId: string, source: Source, data: PlanData) {
@@ -59,6 +80,9 @@ export async function savePlan(planId: string | null, source: Source, input: unk
     if (data.startDate < today) data.startDate = existing.planData.startDate < today ? today : existing.planData.startDate;
     const blocking = analyzePlan(data).issues.find((i) => i.level === "error");
     if (blocking) return { ok: false, error: blocking.message };
+    // A shortened learning/revision period must still cover today — otherwise the cycle would
+    // already be "over" the moment this save lands, orphaning whatever's left unscheduled.
+    if (cycleEnd(data) < today) return { ok: false, error: "প্ল্যানের মেয়াদ এত কমানো যাবে না — এখন পর্যন্ত চলা দিনগুলো তার মধ্যেই পড়ে না" };
   }
 
   await withDbRetry(() =>
@@ -95,7 +119,7 @@ export async function approvePlan(planId: string): Promise<Result> {
   );
   if (active.c > 0) return { ok: false, error: "আপনার একটি চলমান প্ল্যান আছে। আগে সেটি আর্কাইভ করুন।" };
 
-  // A draft whose start date has already passed starts today, so the full 30 days are available.
+  // A draft whose start date has already passed starts today, so the full learning period is available.
   const today = await todayFor(userId);
   const data = plan.planData.startDate < today ? { ...plan.planData, startDate: today } : plan.planData;
   await withDbRetry(() =>
@@ -193,10 +217,10 @@ Use your knowledge of the relevant official syllabus and mark distribution (e.g.
 give higher priority to high-mark and weak areas, and ask the user to confirm because syllabi change. For job exams, topics can be
 syllabus sections (e.g. "বাংলা ব্যাকরণ", "বাংলাদেশ বিষয়াবলি — মুক্তিযুদ্ধ", "গাণিতিক যুক্তি — শতকরা") rather than textbook chapters.`;
 
-const CHAT_SYSTEM = (today: string) => `You are PLANORA's study-planning assistant.
+const CHAT_SYSTEM = (today: string, learningDays: number) => `You are PLANORA's study-planning assistant.
 ${AUDIENCE}
 Reply in the student's language (Bangla by default; English if they write English). Be warm, short and clear.
-Your job: through conversation, collect what is needed for a 30-day study plan (+ revision days added automatically):
+Your job: through conversation, collect what is needed for a ${learningDays}-day study plan (+ revision days added automatically):
 - which exam/goal (e.g. "৪৭তম বিসিএস প্রিলি", "HSC 2027", "ঢাবি ভর্তি", "ব্যাংক জব") and whether they study full-time or alongside a job
 - subjects, and the chapters/topics of each subject
 - difficulty of each topic for this student (easy/medium/hard)
@@ -217,7 +241,9 @@ Today is ${today}.`;
 export type ChatMessage = { role: "user" | "assistant"; text: string };
 
 export async function aiChatTurn(
-  history: ChatMessage[]
+  history: ChatMessage[],
+  /** Only honored for the super_admin — see resolveLearningDays. */
+  requestedLearningDays?: number
 ): Promise<Result<{ reply: string; ready: boolean; missing: string[]; draft: AiDraft }>> {
   const userId = await requireUserId();
   const limit = await checkQuota(userId);
@@ -231,9 +257,10 @@ export async function aiChatTurn(
     parts: [{ text: m.text }],
   }));
 
+  const learningDays = await resolveLearningDays(userId, requestedLearningDays);
   try {
     const raw = await callAi(userId, "planner_chat", {
-      system: CHAT_SYSTEM(todayIso()),
+      system: CHAT_SYSTEM(todayIso(), learningDays),
       contents,
       responseSchema: chatResponseSchema,
     });
@@ -245,16 +272,22 @@ export async function aiChatTurn(
   }
 }
 
-export async function createPlanFromDraft(draft: unknown, source: Source): Promise<Result<{ id: string }>> {
+export async function createPlanFromDraft(
+  draft: unknown,
+  source: Source,
+  /** Only honored for the super_admin — see resolveLearningDays. */
+  requestedLearningDays?: number
+): Promise<Result<{ id: string }>> {
   const userId = await requireUserId();
   const d = aiDraftSchema.safeParse(draft);
   if (!d.success) return { ok: false, error: "ড্রাফট সঠিক নয়" };
-  const n = await normalise(userId, draftToPlan(d.data));
+  const learningDays = await resolveLearningDays(userId, requestedLearningDays);
+  const n = await normalise(userId, draftToPlan(d.data, learningDays));
   if (!n.ok) return n;
   return { ok: true, id: await insertDraft(userId, source, n.data) };
 }
 
-const AUTO_SYSTEM = `You generate complete 30-day study plan drafts.
+const AUTO_SYSTEM = (learningDays: number) => `You generate complete ${learningDays}-day study plan drafts.
 ${AUDIENCE}
 Break every subject into concrete chapters/topics/syllabus sections appropriate to the stated exam (typically 5–15 per subject).
 Give each topic a difficulty (easy/medium/hard) and estimatedMinutes (realistic first-time learning time, 30–300).
@@ -272,29 +305,32 @@ export async function autoGeneratePlan(input: {
   examDate: string;
   dailyStudyMinutes: number;
   notes: string;
+  /** Only honored for the super_admin — see resolveLearningDays. */
+  learningDays?: number;
 }): Promise<Result<{ id: string }>> {
   const userId = await requireUserId();
   if (!input.subjects.trim()) return { ok: false, error: "অন্তত একটি বিষয় লিখুন" };
   const minutes = Math.min(720, Math.max(30, Math.round(input.dailyStudyMinutes || 0)));
   const limit = await checkQuota(userId);
   if (limit) return { ok: false, error: limit };
+  const learningDays = await resolveLearningDays(userId, input.learningDays);
 
   const prompt = `Goal / level: ${input.goal.slice(0, 300) || "(not given)"}
 Subjects: ${input.subjects.slice(0, 1500)}
 Exam date: ${input.examDate || "(none)"}
-Daily study time: ${minutes} minutes, 30 learning days → about ${minutes * 30} minutes available in total.
+Daily study time: ${minutes} minutes, ${learningDays} learning days → about ${minutes * learningDays} minutes available in total.
 Weak areas / extra notes: ${input.notes.slice(0, 1000) || "(none)"}
 Today: ${todayIso()}`;
 
   try {
     const raw = await callAi(userId, "planner_auto", {
-      system: AUTO_SYSTEM,
+      system: AUTO_SYSTEM(learningDays),
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       responseSchema: draftResponseSchema,
       temperature: 0.3,
     });
     const draft = aiDraftSchema.parse(raw);
-    const plan = draftToPlan({ ...draft, dailyStudyMinutes: minutes, examDate: input.examDate || draft.examDate });
+    const plan = draftToPlan({ ...draft, dailyStudyMinutes: minutes, examDate: input.examDate || draft.examDate }, learningDays);
     if (!plan.subjects.length) return { ok: false, error: "AI প্ল্যান বানাতে পারেনি, বিষয়গুলো আরও পরিষ্কার করে লিখুন" };
     const n = await normalise(userId, plan);
     if (!n.ok) return n;

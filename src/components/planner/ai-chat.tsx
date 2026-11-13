@@ -8,10 +8,10 @@ import { ui } from "@/components/ui";
 import { draftToPlan } from "@/lib/plan/draft";
 import { downloadJson } from "@/lib/plan/import";
 
-const GREETING =
-  "আসসালামু আলাইকুম! 👋 আমি আপনার ৩০ দিনের স্টাডি প্ল্যান বানাতে সাহায্য করব। শুরুতে বলুন — কোন পরীক্ষার প্রস্তুতি নিচ্ছেন? (যেমন: বিসিএস, ব্যাংক জব, ভর্তি পরীক্ষা, বিশ্ববিদ্যালয়ের সেমিস্টার, HSC…) আর আপনি কি ফুল-টাইম পড়ছেন নাকি চাকরির পাশাপাশি?";
+const greeting = (days: number) =>
+  `আসসালামু আলাইকুম! 👋 আমি আপনার ${days} দিনের স্টাডি প্ল্যান বানাতে সাহায্য করব। শুরুতে বলুন — কোন পরীক্ষার প্রস্তুতি নিচ্ছেন? (যেমন: বিসিএস, ব্যাংক জব, ভর্তি পরীক্ষা, বিশ্ববিদ্যালয়ের সেমিস্টার, HSC…) আর আপনি কি ফুল-টাইম পড়ছেন নাকি চাকরির পাশাপাশি?`;
 
-export function AiChat() {
+export function AiChat({ learningDays }: { learningDays?: number }) {
   const router = useRouter();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -34,7 +34,7 @@ export function AiChat() {
     setInput("");
     setError("");
     startThinking(async () => {
-      const res = await aiChatTurn(history);
+      const res = await aiChatTurn(history, learningDays);
       if (!res.ok) {
         setError(res.error);
         return;
@@ -49,7 +49,7 @@ export function AiChat() {
   const create = () =>
     startCreating(async () => {
       if (!draft) return;
-      const res = await createPlanFromDraft(draft, "ai_chat");
+      const res = await createPlanFromDraft(draft, "ai_chat", learningDays);
       if (!res.ok) return setError(res.error);
       router.push(`/planner/${res.id}`);
     });
@@ -59,7 +59,7 @@ export function AiChat() {
   return (
     <div className="flex h-[calc(100dvh-9.5rem)] flex-col md:h-[calc(100dvh-6.5rem)]">
       <div className="flex-1 space-y-3 overflow-y-auto pb-4">
-        <Bubble role="assistant" text={GREETING} />
+        <Bubble role="assistant" text={greeting(learningDays ?? 30)} />
         {messages.map((m, i) => (
           <Bubble key={i} role={m.role} text={m.text} />
         ))}

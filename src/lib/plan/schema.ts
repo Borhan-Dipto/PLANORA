@@ -2,7 +2,12 @@ import { z } from "zod";
 
 /** Internal versioned plan format (v1). Every planner (manual / AI chat / automatic) produces this. */
 export const PLAN_SCHEMA_VERSION = 1;
+/** Default learning-period length (days) — what every free-tier plan is fixed to. */
 export const LEARNING_DAYS = 30;
+/** super_admin can set the learning period anywhere in this range (1 week to 6 months) — not yet
+ * opened to paying premium users; everyone else is fixed to LEARNING_DAYS. */
+export const MIN_LEARNING_DAYS = 7;
+export const MAX_LEARNING_DAYS = 180;
 export const FREE_REVISION_DAYS = 3;
 export const MIN_REVISION_DAYS = 3;
 export const MAX_REVISION_DAYS = 10;
@@ -36,7 +41,7 @@ export const planDataSchema = z.object({
   goal: z.string().trim().max(500).optional().default(""),
   startDate: isoDate,
   examDate: isoDate.optional().or(z.literal("")).default(""),
-  learningDays: z.literal(LEARNING_DAYS),
+  learningDays: z.coerce.number().int().min(MIN_LEARNING_DAYS, "প্ল্যানের মেয়াদ কমপক্ষে ৭ দিন").max(MAX_LEARNING_DAYS, "প্ল্যানের মেয়াদ সর্বোচ্চ ১৮০ দিন").default(LEARNING_DAYS),
   revisionDays: z.coerce.number().int().min(MIN_REVISION_DAYS).max(MAX_REVISION_DAYS),
   dailyStudyMinutes: z.coerce.number().int().min(30, "দিনে কমপক্ষে ৩০ মিনিট").max(720, "দিনে সর্বোচ্চ ১২ ঘণ্টা"),
   /** 0 = Sunday … 6 = Saturday */

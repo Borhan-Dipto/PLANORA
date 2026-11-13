@@ -5,7 +5,7 @@ import type { PlanData } from "@/lib/plan/schema";
 export const planStatusEnum = pgEnum("plan_status", ["draft", "active", "completed", "archived"]);
 export const planSourceEnum = pgEnum("plan_source", ["manual", "ai_chat", "automatic"]);
 
-/** A study plan = one 30-day learning cycle + N revision days. Content lives in versioned JSON (planData). */
+/** A study plan = one learning cycle (30 days by default; super_admin can set a custom length) + N revision days. Content lives in versioned JSON (planData). */
 export const plans = pgTable(
   "plans",
   {

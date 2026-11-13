@@ -1,5 +1,5 @@
 import { aiDraftSchema, draftToPlan } from "./draft";
-import { MAX_REVISION_DAYS, MIN_REVISION_DAYS, type PlanData } from "./schema";
+import { MAX_REVISION_DAYS, MIN_REVISION_DAYS, MIN_LEARNING_DAYS, MAX_LEARNING_DAYS, LEARNING_DAYS, type PlanData } from "./schema";
 
 /**
  * PLANORA exchange format (what users import/export and what the master prompt asks chatbots to produce):
@@ -96,6 +96,7 @@ function normalise(raw: Obj) {
   const revision = pick(raw, "revision_phase", "revisionPhase");
   const revisionDays = num(isObj(revision) ? pick(revision, "duration_days", "durationDays") : pick(raw, "revision_days", "revisionDays"));
   const weekdays = pick(raw, "study_weekdays", "studyWeekdays");
+  const learningDays = num(pick(raw, "learning_days", "learningDays"));
 
   return {
     draft: {
@@ -120,6 +121,7 @@ function normalise(raw: Obj) {
       })),
     },
     revisionDays: Number.isFinite(revisionDays) ? revisionDays : undefined,
+    learningDays: Number.isFinite(learningDays) ? learningDays : undefined,
     studyWeekdays: Array.isArray(weekdays) ? weekdays.map(num).filter((n) => Number.isInteger(n) && n >= 0 && n <= 6) : [],
     startDate: str(pick(raw, "start_date", "startDate")),
   };
@@ -142,7 +144,12 @@ export function parsePlanJson(text: string): ImportResult {
   if (!isObj(raw)) return { ok: false, error: "JSON-এর কাঠামো মিলছে না — মাস্টার প্রম্পট ব্যবহার করুন" };
 
   const n = normalise(raw);
-  const plan = draftToPlan(aiDraftSchema.parse(n.draft));
+  // Clamped here regardless of who's importing — the caller (plan editor) re-gates learningDays
+  // by isSuperAdmin, and the server re-gates it again on save, so this is just sane bounds, not
+  // the real permission check.
+  const learningDays =
+    n.learningDays !== undefined ? Math.min(MAX_LEARNING_DAYS, Math.max(MIN_LEARNING_DAYS, Math.round(n.learningDays))) : LEARNING_DAYS;
+  const plan = draftToPlan(aiDraftSchema.parse(n.draft), learningDays);
   if (n.studyWeekdays.length) plan.studyWeekdays = [...new Set(n.studyWeekdays)].sort();
   if (/^\d{4}-\d{2}-\d{2}$/.test(n.startDate)) plan.startDate = n.startDate;
   if (n.revisionDays !== undefined)

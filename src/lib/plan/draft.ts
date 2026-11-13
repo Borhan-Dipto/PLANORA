@@ -40,7 +40,11 @@ export const chatTurnSchema = z.object({
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, Math.round(n)));
 
-export function draftToPlan(d: AiDraft): PlanData {
+/**
+ * `learningDays` overrides the default 30-day period — a super_admin-only capability today; every
+ * caller re-validates the caller's role before passing anything other than the default in.
+ */
+export function draftToPlan(d: AiDraft, learningDays: number = LEARNING_DAYS): PlanData {
   const base = emptyPlan();
   const daily = d.dailyStudyMinutes > 0 ? clamp(d.dailyStudyMinutes, 30, 720) : base.dailyStudyMinutes;
 
@@ -69,7 +73,7 @@ export function draftToPlan(d: AiDraft): PlanData {
   const unknown = all.filter((t) => !t.estimatedMinutes);
   if (unknown.length) {
     const known = all.reduce((n, t) => n + t.estimatedMinutes, 0);
-    const each = Math.max(0, daily * LEARNING_DAYS - known) / unknown.length;
+    const each = Math.max(0, daily * learningDays - known) / unknown.length;
     const minutes = clamp(Math.round(each / 5) * 5, 15, 240);
     unknown.forEach((t) => (t.estimatedMinutes = minutes));
   }
@@ -80,6 +84,7 @@ export function draftToPlan(d: AiDraft): PlanData {
     goal: d.goal.trim().slice(0, 500),
     examDate: /^\d{4}-\d{2}-\d{2}$/.test(d.examDate) ? d.examDate : "",
     dailyStudyMinutes: daily,
+    learningDays,
     subjects,
     dailyTargets: d.dailyTargets.map((x) => x.trim().slice(0, 200)).filter(Boolean).slice(0, 20),
   };
