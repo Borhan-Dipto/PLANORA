@@ -1,12 +1,20 @@
 import "server-only";
 import { and, eq, gt, desc } from "drizzle-orm";
 import { db, withDbRetry } from "@/db/client";
-import { subscriptions } from "@/db/schema";
+import { subscriptions, profiles } from "@/db/schema";
 
 export type Tier = "free" | "premium";
 
-/** A user is premium while they have any subscription row whose expiresAt is still in the future. */
+/**
+ * A user is premium while they have any subscription row whose expiresAt is still in the future —
+ * or, regardless of subscription, while they are the super_admin: the super_admin can use every
+ * premium feature (flexible revision days, higher AI quota, and anything added later) without
+ * ever needing to buy or be granted a plan.
+ */
 export async function getUserTier(userId: string): Promise<Tier> {
+  const [profile] = await withDbRetry(() => db.select({ role: profiles.role }).from(profiles).where(eq(profiles.id, userId)));
+  if (profile?.role === "super_admin") return "premium";
+
   const [row] = await withDbRetry(() =>
     db
       .select({ expiresAt: subscriptions.expiresAt })
