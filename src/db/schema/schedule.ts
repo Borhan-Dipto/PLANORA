@@ -2,7 +2,7 @@ import { pgTable, uuid, text, integer, date, timestamp, pgEnum, index, boolean }
 import { profiles } from "./profiles";
 import { plans } from "./plans";
 
-export const taskKindEnum = pgEnum("task_kind", ["study", "habit", "revision"]);
+export const taskKindEnum = pgEnum("task_kind", ["study", "habit", "revision", "break"]);
 export const taskStatusEnum = pgEnum("task_status", ["pending", "done", "skipped"]);
 
 /** One scheduled item on one day. Titles are snapshotted so history survives plan edits. */

@@ -8,7 +8,7 @@ import { fmtMinutes } from "@/components/ui";
 
 export type TaskItem = {
   id: string;
-  kind: "study" | "habit" | "revision";
+  kind: "study" | "habit" | "revision" | "break";
   title: string;
   subjectName: string | null;
   minutes: number;
@@ -39,7 +39,7 @@ export function TaskList({
   );
 
   const toggle = (t: TaskItem) => {
-    if (readOnly) return;
+    if (readOnly || t.kind === "break") return;
     const done = t.status !== "done";
     start(async () => {
       setOptimistic({ id: t.id, done });
@@ -63,6 +63,16 @@ export function TaskList({
           </div>
           <ul className="space-y-2">
             {g.tasks.map((t) => {
+              if (t.kind === "break") {
+                return (
+                  <li
+                    key={t.id}
+                    className="flex items-center gap-3 rounded-lg border border-dashed border-border bg-transparent p-3 text-sm text-muted"
+                  >
+                    🌴 {t.title}
+                  </li>
+                );
+              }
               const done = t.status === "done";
               const canFocus =
                 showFocusStart &&

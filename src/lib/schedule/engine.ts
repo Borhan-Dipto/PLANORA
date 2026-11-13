@@ -1,4 +1,4 @@
-import { addDays, type PlanData } from "@/lib/plan/schema";
+import { addDays, addActiveDays, type PlanData } from "@/lib/plan/schema";
 
 /**
  * Deterministic scheduling engine (pure — no I/O, fully testable).
@@ -14,7 +14,7 @@ import { addDays, type PlanData } from "@/lib/plan/schema";
 
 export type NewTask = {
   date: string;
-  kind: "study" | "habit" | "revision";
+  kind: "study" | "habit" | "revision" | "break";
   subjectId: string | null;
   topicId: string | null;
   subjectName: string | null;
@@ -33,11 +33,12 @@ export type ScheduleResult = {
   studyDays: number;
 };
 
+/** Each taken break date pushes this back by exactly one calendar day — see addActiveDays. */
 export function learningEnd(plan: PlanData) {
-  return addDays(plan.startDate, plan.learningDays - 1);
+  return addActiveDays(plan.startDate, plan.breakDates ?? [], plan.learningDays);
 }
 export function cycleEnd(plan: PlanData) {
-  return addDays(plan.startDate, plan.learningDays + plan.revisionDays - 1);
+  return addActiveDays(plan.startDate, plan.breakDates ?? [], plan.learningDays + plan.revisionDays);
 }
 
 export function datesBetween(from: string, to: string, weekdays: number[]) {

@@ -49,6 +49,10 @@ export const planDataSchema = z.object({
   subjects: z.array(subjectSchema).max(30),
   /** Recurring daily habits, e.g. "প্রতিদিন English Newspaper পড়া" */
   dailyTargets: z.array(z.string().trim().min(1).max(200)).max(20).optional().default([]),
+  /** Dates (YYYY-MM-DD) the user has taken as a break — super_admin-only for now (see isSuperAdmin
+   * gate in actions/plans.ts). Each one pushes learningEnd/cycleEnd back by exactly one day; see
+   * addActiveDays below. Not necessarily sorted; dedupe/sort on write. */
+  breakDates: z.array(isoDate).max(366).optional().default([]),
 });
 
 export type PlanData = z.infer<typeof planDataSchema>;
@@ -76,6 +80,7 @@ export function emptyPlan(): PlanData {
     studyWeekdays: [0, 1, 2, 3, 4, 5, 6],
     subjects: [],
     dailyTargets: [],
+    breakDates: [],
   };
 }
 
@@ -116,7 +121,7 @@ export function analyzePlan(plan: PlanData): { issues: PlanIssue[]; stats: PlanS
     issues.push({ level: "error", message: "পরীক্ষার তারিখ শুরুর তারিখের আগে" });
   }
   if (plan.examDate) {
-    const cycleEnd = addDays(plan.startDate, plan.learningDays + plan.revisionDays - 1);
+    const cycleEnd = addActiveDays(plan.startDate, plan.breakDates ?? [], plan.learningDays + plan.revisionDays);
     if (plan.examDate < cycleEnd) {
       issues.push({ level: "warning", message: `পরীক্ষা (${plan.examDate}) সাইকেল শেষ হওয়ার (${cycleEnd}) আগে` });
     }
@@ -144,10 +149,20 @@ export function planStats(plan: PlanData): PlanStats {
   const studyWeekdays = plan.studyWeekdays ?? [];
   const totalTopics = subjects.reduce((n, s) => n + (s.topics ?? []).length, 0);
   const totalMinutes = subjects.reduce((n, s) => n + (s.topics ?? []).reduce((m, t) => m + t.estimatedMinutes, 0), 0);
+  const breakDates = plan.breakDates ?? [];
   let studyDayCount = 0;
-  for (let i = 0; i < plan.learningDays; i++) {
-    const wd = new Date(addDays(plan.startDate, i) + "T00:00:00Z").getUTCDay();
-    if (studyWeekdays.includes(wd)) studyDayCount++;
+  {
+    const skip = new Set(breakDates);
+    let d = plan.startDate;
+    let seen = 0;
+    while (seen < plan.learningDays) {
+      if (!skip.has(d)) {
+        seen++;
+        const wd = new Date(d + "T00:00:00Z").getUTCDay();
+        if (studyWeekdays.includes(wd)) studyDayCount++;
+      }
+      d = addDays(d, 1);
+    }
   }
   const availableMinutes = studyDayCount * plan.dailyStudyMinutes;
   return {
@@ -156,7 +171,7 @@ export function planStats(plan: PlanData): PlanStats {
     studyDayCount,
     availableMinutes,
     loadPercent: availableMinutes ? Math.round((totalMinutes / availableMinutes) * 100) : 0,
-    endDate: addDays(plan.startDate, plan.learningDays + plan.revisionDays - 1),
+    endDate: addActiveDays(plan.startDate, breakDates, plan.learningDays + plan.revisionDays),
   };
 }
 
@@ -164,4 +179,23 @@ export function addDays(iso: string, days: number) {
   const d = new Date(iso + "T00:00:00Z");
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
+}
+
+/** Returns the date of the Nth day (1-indexed) counting forward from `startDate`, skipping any
+ * date present in `breakDates`. This is how a break extends the calendar without shrinking the
+ * number of real (non-break) days a plan gets — used by learningEnd/cycleEnd in schedule/engine.ts
+ * and by planStats here. Defined in schema.ts (not engine.ts) to avoid a circular import, since
+ * engine.ts already imports addDays/PlanData from this file. */
+export function addActiveDays(startDate: string, breakDates: string[], count: number): string {
+  if (count <= 0) return startDate;
+  const skip = breakDates.length ? new Set(breakDates) : null;
+  let d = startDate;
+  let seen = 0;
+  while (true) {
+    if (!skip || !skip.has(d)) {
+      seen++;
+      if (seen === count) return d;
+    }
+    d = addDays(d, 1);
+  }
 }

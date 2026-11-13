@@ -43,6 +43,33 @@ export default async function DayPlannerPage({ searchParams }: { searchParams: P
     );
   }
 
+  // A date the user has taken as a break (see takeBreak in actions/plans.ts) already shows
+  // "বিরতি" on the normal schedule — manually planning study on top of that would contradict the
+  // whole point of the feature, so this page offers nothing to pick for that date.
+  const [breakRow] = await db
+    .select({ id: planTasks.id })
+    .from(planTasks)
+    .where(and(eq(planTasks.planId, active.id), eq(planTasks.date, date), eq(planTasks.kind, "break")));
+  if (breakRow) {
+    return (
+      <PageFrame title="দিনের সময় ঠিক করুন" back="/dashboard">
+        <div className="space-y-4">
+          <div className="flex gap-2">
+            <Link href="/planner/day" className={`${ui.btn} ${date === today ? ui.primary : ui.secondary}`}>
+              আজ
+            </Link>
+            <Link href="/planner/day?d=tomorrow" className={`${ui.btn} ${date === tomorrow ? ui.primary : ui.secondary}`}>
+              আগামীকাল
+            </Link>
+          </div>
+          <div className={`${ui.card} text-center text-muted`}>
+            <p>🌴 এই দিনটি ব্রেক হিসেবে রাখা হয়েছে — কোনো পড়া নির্ধারণের প্রয়োজন নেই।</p>
+          </div>
+        </div>
+      </PageFrame>
+    );
+  }
+
   // Minutes already "spoken for" per topic elsewhere (done, or locked on a different day) — this
   // date's own existing tasks don't count, since the user is about to re-pick them below.
   const spoken = await db

@@ -18,7 +18,7 @@ import {
 import { aiDraftSchema, chatTurnSchema, draftToPlan, type AiDraft } from "@/lib/plan/draft";
 import { AiError, chatResponseSchema, draftResponseSchema, generateJson, type GeminiContent } from "@/lib/ai/gemini";
 import { getUserTier, AI_DAILY_LIMIT } from "@/lib/plan/tier";
-import { regenerateSchedule, todayFor } from "@/lib/schedule/service";
+import { regenerateSchedule, todayFor, takeBreak as takeBreakSchedule } from "@/lib/schedule/service";
 import { cycleEnd } from "@/lib/schedule/engine";
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
@@ -131,6 +131,33 @@ export async function approvePlan(planId: string): Promise<Result> {
   await regenerateSchedule(planId, userId, data, today);
   revalidatePath("/planner");
   revalidatePath("/dashboard");
+  return { ok: true };
+}
+
+const MAX_BREAK_DAYS = 60;
+
+/**
+ * Pauses the active plan's whole routine for `days` calendar days starting today, then shifts
+ * everything after it back by exactly that many days — nothing else changes. Super_admin-only
+ * for now (not yet opened to paying premium users); gated the same single-line way as
+ * resolveLearningDays above, so opening it to premium later is a one-line change here.
+ */
+export async function takeBreak(planId: string, days: number): Promise<Result> {
+  const userId = await requireUserId();
+  if (!(await isSuperAdmin(userId))) return { ok: false, error: "এই ফিচারটি এখনো শুধু সুপার অ্যাডমিনের জন্য" };
+  const n = Math.round(days);
+  if (!Number.isFinite(n) || n < 1 || n > MAX_BREAK_DAYS)
+    return { ok: false, error: `ব্রেক ১ থেকে ${MAX_BREAK_DAYS} দিনের মধ্যে হতে হবে` };
+
+  const [plan] = await withDbRetry(() =>
+    db.select().from(plans).where(and(eq(plans.id, planId), eq(plans.userId, userId))),
+  );
+  if (!plan || plan.status !== "active") return { ok: false, error: "চলমান প্ল্যান পাওয়া যায়নি" };
+
+  const today = await todayFor(userId);
+  await takeBreakSchedule(planId, userId, plan.planData, today, n);
+  revalidatePath("/dashboard");
+  revalidatePath(`/planner/${planId}/schedule`);
   return { ok: true };
 }
 

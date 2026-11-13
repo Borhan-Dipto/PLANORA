@@ -3,7 +3,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { db, withDbRetry } from "@/db/client";
 import { profiles, planTasks, userPreferences } from "@/db/schema";
 import { signOut } from "@/lib/actions/auth";
-import { requireUserId } from "@/lib/session";
+import { requireUserId, isSuperAdmin } from "@/lib/session";
 import { getDictionary, getLocale } from "@/lib/i18n";
 import { AppShell } from "@/components/app-shell";
 import { getActivePlan, missedCount, tasksForDates, todayInTz } from "@/lib/schedule/service";
@@ -13,6 +13,7 @@ import { TaskList } from "@/components/schedule/task-list";
 import { groupBySubject } from "@/lib/schedule/group";
 import { getActiveFocusSession } from "@/lib/actions/focus";
 import { RescheduleBanner } from "@/components/schedule/reschedule-button";
+import { TakeBreakButton } from "@/components/schedule/take-break-button";
 import { LiveTimeBudget } from "@/components/schedule/live-time-budget";
 import { LiveClock } from "@/components/live-clock";
 import { ui, fmtMinutes } from "@/components/ui";
@@ -28,12 +29,13 @@ export default async function DashboardPage() {
   // name/email — this page used to fetch the profiles row twice (once via todayFor(), once here).
   const [profile] = await withDbRetry(() => db.select().from(profiles).where(eq(profiles.id, userId)));
   const today = todayInTz(profile?.timezone || "Asia/Dhaka");
-  const [[prefs], dict, locale, active, focusSession] = await Promise.all([
+  const [[prefs], dict, locale, active, focusSession, superAdmin] = await Promise.all([
     withDbRetry(() => db.select().from(userPreferences).where(eq(userPreferences.userId, userId))),
     getDictionary(),
     getLocale(),
     getActivePlan(userId, today),
     getActiveFocusSession(),
+    isSuperAdmin(userId),
   ]);
 
   let body: React.ReactNode;
@@ -119,6 +121,8 @@ export default async function DashboardPage() {
             <span className="text-accent">→</span>
           </Link>
         )}
+
+        {!notStarted && superAdmin && <TakeBreakButton planId={active.id} />}
 
         <section className={ui.card}>
           <h2 className="mb-3 font-semibold">আজকের পড়ার তালিকা</h2>

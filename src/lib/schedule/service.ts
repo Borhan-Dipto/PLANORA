@@ -2,7 +2,7 @@ import "server-only";
 import { and, eq, inArray, lt, gte, sql } from "drizzle-orm";
 import { db, withDbRetry } from "@/db/client";
 import { plans, planTasks, profiles } from "@/db/schema";
-import type { PlanData } from "@/lib/plan/schema";
+import { addDays, type PlanData } from "@/lib/plan/schema";
 import { buildRevisionTasks, buildSchedule, cycleEnd } from "./engine";
 
 /** Today's date (YYYY-MM-DD) in the user's timezone. */
@@ -87,6 +87,57 @@ export async function regenerateSchedule(planId: string, userId: string, plan: P
       await tx.insert(planTasks).values(allTasks.slice(i, i + 500).map((t) => ({ ...t, planId, userId })));
     }
   }));
+}
+
+/**
+ * Marks the next `days` calendar days (starting `today`) as a break: those dates show "বিরতি"
+ * instead of the normal routine, and everything scheduled after them shifts back by exactly
+ * `days` days — nothing else about the plan changes. Relies on two existing mechanisms rather
+ * than adding new ones: `plan.breakDates` already extends learningEnd/cycleEnd (see
+ * schedule/engine.ts), and inserting these rows with `locked: true` makes regenerateSchedule's
+ * own `lockedDates` query (below) skip them automatically, exactly like a manually-fixed day.
+ * Caller (the server action) is responsible for the access gate (super_admin-only for now).
+ */
+export async function takeBreak(planId: string, userId: string, plan: PlanData, today: string, days: number) {
+  const existing = new Set(plan.breakDates ?? []);
+  const newDates: string[] = [];
+  for (let i = 0; i < days; i++) {
+    const d = addDays(today, i);
+    if (!existing.has(d)) newDates.push(d);
+  }
+  const breakDates = [...existing, ...newDates].sort();
+  const data: PlanData = { ...plan, breakDates };
+
+  await withDbRetry(() =>
+    db.transaction(async (tx) => {
+      if (newDates.length) {
+        // Whatever was on these dates before (study/revision/habit, done or pending) is replaced
+        // by the break — the day is now totally "off", as the user described wanting.
+        await tx.delete(planTasks).where(and(eq(planTasks.planId, planId), inArray(planTasks.date, newDates)));
+        await tx.insert(planTasks).values(
+          newDates.map((d) => ({
+            planId,
+            userId,
+            date: d,
+            kind: "break" as const,
+            subjectId: null,
+            topicId: null,
+            subjectName: null,
+            title: "বিরতি",
+            minutes: 0,
+            part: 1,
+            parts: 1,
+            sort: -1,
+            locked: true,
+          })),
+        );
+      }
+      await tx.update(plans).set({ planData: data, updatedAt: new Date() }).where(eq(plans.id, planId));
+    }),
+  );
+
+  await regenerateSchedule(planId, userId, data, today);
+  return data;
 }
 
 /** The user's active plan; flips it to "completed" once its cycle (learning + revision) is over. */
