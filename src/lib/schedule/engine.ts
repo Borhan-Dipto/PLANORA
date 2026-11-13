@@ -5,8 +5,11 @@ import { addDays, type PlanData } from "@/lib/plan/schema";
  * Spreads the remaining study minutes of every topic across the remaining study days of the 30-day
  * learning window, interleaving subjects in proportion to their priority, keeping each subject's
  * topic order. A topic is never split across days — whichever day a topic starts on is the day it
- * finishes on, even if that pushes the day over its usual target; day-to-day minutes are paced by
- * assigning whole topics (biggest-first isn't forced, so a long topic can still overshoot a day).
+ * finishes on — and a day's total never exceeds the plan's daily study-time cap: a topic that
+ * doesn't fit in what's left of today is deferred whole to the next day instead. (The day's first
+ * topic always goes in regardless of size, so no day is left empty; `analyzePlan` rejects any
+ * topic longer than the daily cap itself, so a topic big enough to force this exception shouldn't
+ * occur in new plans — it only guards legacy data.)
  */
 
 export type NewTask = {
@@ -121,28 +124,44 @@ export function buildSchedule(
     const last = day === days.length - 1;
     const weekday = new Date(date + "T00:00:00Z").getUTCDay();
     // Pace the whole remaining load evenly over the remaining days (so a light plan fills all 30
-    // days instead of finishing in the first week); a plan heavier than the daily time simply
-    // runs over it evenly rather than piling up at the end.
+    // days instead of finishing in the first week) — a soft per-day target, never the hard ceiling.
     const leftTotal = queues.reduce((n, q) => n + q.topics.reduce((m, t) => m + t.left, 0), 0);
-    let budget = Math.max(30, Math.ceil(leftTotal / (days.length - day)));
+    const paced = Math.max(30, Math.ceil(leftTotal / (days.length - day)));
+    // The real, hard daily ceiling — a topic is never split, and (aside from the day's very first
+    // topic, which always goes in so no day is left empty, and the last day, which must absorb
+    // everything left) nothing is added once it would push the day past this.
+    const cap = plan.dailyStudyMinutes;
+    // Subjects whose next topic didn't fit in what's left of today — skipped for the rest of
+    // today (not forever), so a smaller topic from another subject can still fill the gap.
+    const blockedToday = new Set<string>();
     for (;;) {
       // A subject with its own chosen weekdays only shows up on those days — except on the very
       // last day, which must absorb every subject's remaining topics so nothing is left unscheduled.
-      const live = queues.filter((q) => q.topics.length && (last || !q.weekdays.length || q.weekdays.includes(weekday)));
+      const live = queues.filter(
+        (q) => q.topics.length && !blockedToday.has(q.id) && (last || !q.weekdays.length || q.weekdays.includes(weekday))
+      );
       if (!live.length) break;
-      // Once today already has at least one topic and its budget is used up, stop — the next
-      // topic goes to tomorrow instead. The day's FIRST topic is always placed regardless of size,
-      // so a day is never left empty and a long topic never gets cut off mid-way.
-      if (!last && budget <= 0 && dayTotals.has(date)) break;
+      const usedToday = dayTotals.get(date) ?? 0;
+      // Once today already has at least one topic and its paced share is used up, stop — the
+      // next topic goes to tomorrow instead.
+      if (!last && usedToday > 0 && usedToday >= paced) break;
       live.sort((a, b) => a.vt - b.vt || b.weight - a.weight || a.idx - b.idx);
       const q = live[0];
       const t = q.topics[0];
-      // Never split a topic across days — whatever starts today finishes today.
+      // Never split a topic across days — whatever starts today finishes today. But also never
+      // push today past the hard daily cap on top of what's already scheduled: if this topic
+      // doesn't fit in what's left, leave it for tomorrow and see if a smaller one does instead.
+      // (The day's first topic always goes in regardless, so no day is left empty; analyzePlan
+      // rejects any topic longer than the daily cap itself, so this exception shouldn't trigger
+      // in practice — it only guards against stale/legacy plan data.)
+      if (!last && usedToday > 0 && usedToday + t.left > cap) {
+        blockedToday.add(q.id);
+        continue;
+      }
       const bite = t.left;
       pushChunk(q, t, date, bite);
       t.left = 0;
       q.vt += bite / q.total; // progress as a share of the subject, so every subject runs through the whole cycle
-      if (!last) budget -= bite;
       q.topics.shift();
     }
   }

@@ -96,6 +96,16 @@ export function analyzePlan(plan: PlanData): { issues: PlanIssue[]; stats: PlanS
     if (days.length && !days.some((w) => plan.studyWeekdays.includes(w))) {
       issues.push({ level: "warning", message: `"${s.name}"-এর বাছাই করা দিনগুলো প্ল্যানের পড়ার দিনের সাথে মিলছে না` });
     }
+    // A topic is never split across days and a day never exceeds the daily study time, so a
+    // topic longer than the whole day's budget is impossible to schedule.
+    for (const t of topics) {
+      if (t.estimatedMinutes > plan.dailyStudyMinutes) {
+        issues.push({
+          level: "error",
+          message: `"${t.name}" (${t.estimatedMinutes} মি.) দৈনিক পড়ার সময়ের (${plan.dailyStudyMinutes} মি.) চেয়ে বড় — টপিকটি ছোট ভাগে ভাগ করুন অথবা দৈনিক সময় বাড়ান`,
+        });
+      }
+    }
   }
   if (plan.examDate && plan.examDate < plan.startDate) {
     issues.push({ level: "error", message: "পরীক্ষার তারিখ শুরুর তারিখের আগে" });
