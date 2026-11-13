@@ -144,6 +144,34 @@ export async function takeBreak(planId: string, userId: string, plan: PlanData, 
   return data;
 }
 
+/**
+ * Cancels every break date from `today` onward (a break date already in the past is left alone —
+ * it already happened, nothing to undo). Removes those dates from `plan.breakDates` (so
+ * learningEnd/cycleEnd shrink back down), deletes their "বিরতি" placeholder rows, and
+ * regenerates the schedule from today so the freed-up days get real study/revision content again.
+ * No-op (returns the plan unchanged) if there was nothing upcoming to cancel.
+ */
+export async function cancelBreak(planId: string, userId: string, plan: PlanData, today: string) {
+  const all = plan.breakDates ?? [];
+  const upcoming = all.filter((d) => d >= today);
+  if (!upcoming.length) return plan;
+
+  const breakDates = all.filter((d) => d < today);
+  const data: PlanData = { ...plan, breakDates };
+
+  await withDbRetry(() =>
+    db.transaction(async (tx) => {
+      await tx
+        .delete(planTasks)
+        .where(and(eq(planTasks.planId, planId), eq(planTasks.kind, "break"), inArray(planTasks.date, upcoming)));
+      await tx.update(plans).set({ planData: data, updatedAt: new Date() }).where(eq(plans.id, planId));
+    }),
+  );
+
+  await regenerateSchedule(planId, userId, data, today);
+  return data;
+}
+
 /** The user's active plan; flips it to "completed" once its cycle (learning + revision) is over. */
 export async function getActivePlan(userId: string, today: string) {
   const [plan] = await withDbRetry(() =>

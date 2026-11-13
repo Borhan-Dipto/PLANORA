@@ -18,7 +18,12 @@ import {
 import { aiDraftSchema, chatTurnSchema, draftToPlan, type AiDraft } from "@/lib/plan/draft";
 import { AiError, chatResponseSchema, draftResponseSchema, generateJson, type GeminiContent } from "@/lib/ai/gemini";
 import { getUserTier, AI_DAILY_LIMIT } from "@/lib/plan/tier";
-import { regenerateSchedule, todayFor, takeBreak as takeBreakSchedule } from "@/lib/schedule/service";
+import {
+  regenerateSchedule,
+  todayFor,
+  takeBreak as takeBreakSchedule,
+  cancelBreak as cancelBreakSchedule,
+} from "@/lib/schedule/service";
 import { cycleEnd } from "@/lib/schedule/engine";
 
 type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
@@ -166,6 +171,29 @@ export async function takeBreak(planId: string, startDate: string, endDate: stri
   if (days > MAX_BREAK_DAYS) return { ok: false, error: `একসাথে সর্বোচ্চ ${MAX_BREAK_DAYS} দিন ব্রেক নেওয়া যাবে` };
 
   await takeBreakSchedule(planId, userId, plan.planData, today, startDate, days);
+  revalidatePath("/dashboard");
+  revalidatePath(`/planner/${planId}/schedule`);
+  revalidatePath("/planner/day");
+  return { ok: true };
+}
+
+/**
+ * Cancels every upcoming (today or later) break on the active plan — removes those break dates,
+ * deletes their "বিরতি" placeholder rows, and regenerates the schedule so the freed days get
+ * real content again. A break date already in the past is left as history. Super_admin-only,
+ * same gate as takeBreak.
+ */
+export async function cancelBreak(planId: string): Promise<Result> {
+  const userId = await requireUserId();
+  if (!(await isSuperAdmin(userId))) return { ok: false, error: "এই ফিচারটি এখনো শুধু সুপার অ্যাডমিনের জন্য" };
+
+  const [plan] = await withDbRetry(() =>
+    db.select().from(plans).where(and(eq(plans.id, planId), eq(plans.userId, userId))),
+  );
+  if (!plan || plan.status !== "active") return { ok: false, error: "চলমান প্ল্যান পাওয়া যায়নি" };
+
+  const today = await todayFor(userId);
+  await cancelBreakSchedule(planId, userId, plan.planData, today);
   revalidatePath("/dashboard");
   revalidatePath(`/planner/${planId}/schedule`);
   revalidatePath("/planner/day");
