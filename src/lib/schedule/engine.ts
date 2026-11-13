@@ -4,7 +4,9 @@ import { addDays, type PlanData } from "@/lib/plan/schema";
  * Deterministic scheduling engine (pure — no I/O, fully testable).
  * Spreads the remaining study minutes of every topic across the remaining study days of the 30-day
  * learning window, interleaving subjects in proportion to their priority, keeping each subject's
- * topic order, and splitting only topics that are larger than a day.
+ * topic order. A topic is never split across days — whichever day a topic starts on is the day it
+ * finishes on, even if that pushes the day over its usual target; day-to-day minutes are paced by
+ * assigning whole topics (biggest-first isn't forced, so a long topic can still overshoot a day).
  */
 
 export type NewTask = {
@@ -128,18 +130,20 @@ export function buildSchedule(
       // last day, which must absorb every subject's remaining topics so nothing is left unscheduled.
       const live = queues.filter((q) => q.topics.length && (last || !q.weekdays.length || q.weekdays.includes(weekday)));
       if (!live.length) break;
-      if (!last && budget < 15) break; // no 5–10 minute scraps at the end of a day
+      // Once today already has at least one topic and its budget is used up, stop — the next
+      // topic goes to tomorrow instead. The day's FIRST topic is always placed regardless of size,
+      // so a day is never left empty and a long topic never gets cut off mid-way.
+      if (!last && budget <= 0 && dayTotals.has(date)) break;
       live.sort((a, b) => a.vt - b.vt || b.weight - a.weight || a.idx - b.idx);
       const q = live[0];
       const t = q.topics[0];
-      const share = round5(Math.max(30, budget / live.length));
-      let bite = last ? t.left : Math.min(t.left, share);
-      if (t.left - bite < 20) bite = t.left; // finish the topic rather than leave a tiny tail for another day
+      // Never split a topic across days — whatever starts today finishes today.
+      const bite = t.left;
       pushChunk(q, t, date, bite);
-      t.left -= bite;
+      t.left = 0;
       q.vt += bite / q.total; // progress as a share of the subject, so every subject runs through the whole cycle
       if (!last) budget -= bite;
-      if (t.left <= 0) q.topics.shift();
+      q.topics.shift();
     }
   }
   for (const bucket of byTopic.values()) bucket.forEach((c, i) => ((c.part = i + 1), (c.parts = bucket.length)));
