@@ -4,7 +4,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db, withDbRetry } from "@/db/client";
 import { plans, planTasks } from "@/db/schema";
-import { requireUserId } from "@/lib/session";
+import { requireUserId, isSuperAdmin } from "@/lib/session";
 import { regenerateSchedule, todayFor } from "@/lib/schedule/service";
 import { learningEnd, cycleEnd, round5 } from "@/lib/schedule/engine";
 import { addDays } from "@/lib/plan/schema";
@@ -34,6 +34,35 @@ export async function rescheduleMissed(planId: string) {
   await regenerateSchedule(plan.id, userId, plan.planData, await todayFor(userId));
   revalidatePath("/dashboard");
   revalidatePath(`/planner/${planId}/schedule`);
+  return { ok: true as const };
+}
+
+/**
+ * "আজকের পড়া কমপ্লিট" — today ran out of time with some topics still pending. Whatever's left
+ * today (the user already told us what's done via the checkboxes — that part is safe, it's
+ * excluded from "remaining" below) moves to tomorrow onward: regenerateSchedule already treats a
+ * topic's un-done minutes as still owed and repacks every pending study/revision task from `from`
+ * forward, so calling it with `from = tomorrow` (instead of the usual `today`) is the whole
+ * mechanism — nothing new to build. If today's leftover doesn't fit into tomorrow's own budget,
+ * buildSchedule's ordinary bin-packing naturally bumps tomorrow's own excess to the day after,
+ * and so on — exactly the one-day-at-a-time ripple the user described. Super_admin-only for now,
+ * as a premium feature (same one-line-to-open-later pattern as the other such gates).
+ */
+export async function completeToday(planId: string) {
+  const userId = await requireUserId();
+  if (!(await isSuperAdmin(userId))) return { ok: false as const, error: "এই ফিচারটি এখনো শুধু সুপার অ্যাডমিনের জন্য" };
+
+  const [plan] = await withDbRetry(() =>
+    db.select().from(plans).where(and(eq(plans.id, planId), eq(plans.userId, userId), eq(plans.status, "active"))),
+  );
+  if (!plan) return { ok: false as const, error: "চলমান প্ল্যান পাওয়া যায়নি" };
+
+  const today = await todayFor(userId);
+  const tomorrow = addDays(today, 1);
+  await regenerateSchedule(planId, userId, plan.planData, tomorrow);
+  revalidatePath("/dashboard");
+  revalidatePath(`/planner/${planId}/schedule`);
+  revalidatePath("/planner/day");
   return { ok: true as const };
 }
 

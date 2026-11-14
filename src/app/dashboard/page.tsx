@@ -15,6 +15,7 @@ import { getActiveFocusSession } from "@/lib/actions/focus";
 import { RescheduleBanner } from "@/components/schedule/reschedule-button";
 import { TakeBreakButton } from "@/components/schedule/take-break-button";
 import { CancelBreakButton } from "@/components/schedule/cancel-break-button";
+import { CompleteTodayButton } from "@/components/schedule/complete-today-button";
 import { LiveTimeBudget } from "@/components/schedule/live-time-budget";
 import { LiveClock } from "@/components/live-clock";
 import { ui, fmtMinutes } from "@/components/ui";
@@ -74,6 +75,7 @@ export default async function DashboardPage() {
     const totalDays = plan.learningDays + plan.revisionDays;
     const notStarted = today < plan.startDate;
     const isRevision = today > learningEnd(plan) && today <= cycleEnd(plan);
+    const pendingToday = tasks.some((t) => (t.kind === "study" || t.kind === "revision") && t.status === "pending");
 
     body = (
       <div className="mt-6 space-y-4">
@@ -131,6 +133,8 @@ export default async function DashboardPage() {
             <TakeBreakButton planId={active.id} today={today} />
           );
         })()}
+
+        {!notStarted && superAdmin && pendingToday && <CompleteTodayButton planId={active.id} />}
 
         <section className={ui.card}>
           <h2 className="mb-3 font-semibold">আজকের পড়ার তালিকা</h2>
