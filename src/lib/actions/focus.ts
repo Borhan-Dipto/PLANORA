@@ -3,7 +3,10 @@
 import { and, eq, sql } from "drizzle-orm";
 import { db, withDbRetry } from "@/db/client";
 import { focusSessions, planTasks } from "@/db/schema";
-import { requireUserId } from "@/lib/session";
+import { requireUserId, isSuperAdmin } from "@/lib/session";
+
+const MIN_FOCUS_TARGET = 5;
+const MAX_FOCUS_TARGET = 600;
 
 export type ActiveSession = {
   id: string;
@@ -120,6 +123,33 @@ export async function completeFocusSession(sessionId: string) {
   // gets to show the "সম্পন্ন!" screen. The dashboard/schedule pages read via requireUserId()
   // (dynamic, uncached), so they already render fresh data on the next real navigation without needing revalidation here.
   return { ok: true as const, actualMinutes, targetMinutes: session.targetMinutes };
+}
+
+/**
+ * +/- 5-minute adjustment to a running session's own target (session.targetMinutes only — the
+ * underlying plan task's scheduled minutes is untouched, so this doesn't retroactively change
+ * future scheduling). Super_admin-only for now, as a premium feature; opening it to paying
+ * premium users later is a one-line change here (same gate pattern as resolveLearningDays/
+ * takeBreak). Clamp + increment happen atomically in SQL so rapid +/- taps can't race each other
+ * into an inconsistent value.
+ */
+export async function adjustFocusTarget(sessionId: string, deltaMinutes: number) {
+  const userId = await requireUserId();
+  if (!(await isSuperAdmin(userId))) return { ok: false as const, error: "এই ফিচারটি এখনো শুধু সুপার অ্যাডমিনের জন্য" };
+  const delta = Math.round(deltaMinutes);
+  if (!delta) return { ok: false as const, error: "সময় পরিবর্তন করা যায়নি" };
+
+  const [updated] = await withDbRetry(() =>
+    db
+      .update(focusSessions)
+      .set({
+        targetMinutes: sql`greatest(${MIN_FOCUS_TARGET}, least(${MAX_FOCUS_TARGET}, ${focusSessions.targetMinutes} + ${delta}))`,
+      })
+      .where(and(eq(focusSessions.id, sessionId), eq(focusSessions.userId, userId), eq(focusSessions.status, "active")))
+      .returning({ targetMinutes: focusSessions.targetMinutes }),
+  );
+  if (!updated) return { ok: false as const, error: "সেশনটি পাওয়া যায়নি" };
+  return { ok: true as const, targetMinutes: updated.targetMinutes };
 }
 
 export async function emergencyExitFocusSession(sessionId: string, reason: string) {

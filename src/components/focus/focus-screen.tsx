@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { completeFocusSession, emergencyExitFocusSession, pingFocusSession, type ActiveSession } from "@/lib/actions/focus";
+import { adjustFocusTarget, completeFocusSession, emergencyExitFocusSession, pingFocusSession, type ActiveSession } from "@/lib/actions/focus";
 
 const RING_R = 120;
 const RING_C = 2 * Math.PI * RING_R;
@@ -45,12 +45,17 @@ function fmtClock(totalSeconds: number) {
     : `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
 }
 
-export function FocusScreen({ session }: { session: ActiveSession }) {
+/** super_admin-only for now (premium feature): the timer auto-completes the moment its target
+ * elapses, and a +/- 5-minute adjuster sits under the ring. Everyone else keeps the existing
+ * manual-finish behavior (countdown runs into "overtime" until they tap "পড়া শেষ করেছি"). */
+export function FocusScreen({ session, superAdmin = false }: { session: ActiveSession; superAdmin?: boolean }) {
   const router = useRouter();
   // Lazy initializer runs once and the value is never reassigned — stable across re-renders
   // without touching a ref during render (which React now flags).
   const [startedAt] = useState(() => new Date(session.startedAtIso).getTime());
   const [elapsedSec, setElapsedSec] = useState(() => Math.max(0, Math.round((Date.now() - startedAt) / 1000)));
+  const [targetMinutes, setTargetMinutes] = useState(session.targetMinutes);
+  const [adjustPending, startAdjust] = useTransition();
   const [distractions, setDistractions] = useState(session.distractionCount);
   const [exitOpen, setExitOpen] = useState(false);
   const [exitReason, setExitReason] = useState("");
@@ -131,7 +136,7 @@ export function FocusScreen({ session }: { session: ActiveSession }) {
     return () => clearInterval(id);
   }, []);
 
-  const targetSecForMilestones = session.targetMinutes * 60;
+  const targetSecForMilestones = targetMinutes * 60;
   useEffect(() => {
     if (targetSecForMilestones <= 0) return;
     const p = elapsedSec / targetSecForMilestones;
@@ -152,6 +157,29 @@ export function FocusScreen({ session }: { session: ActiveSession }) {
       if (res.ok) setDone({ actualMinutes: res.actualMinutes, targetMinutes: res.targetMinutes });
     });
   }, [session.id]);
+
+  // super_admin-only auto-complete: the moment the target elapses, close the session the same
+  // way the manual "পড়া শেষ করেছি" button does — no extra tap needed. autoFinished guards
+  // against firing twice (e.g. a re-render landing exactly on the threshold again).
+  const autoFinished = useRef(false);
+  useEffect(() => {
+    if (!superAdmin || done || autoFinished.current) return;
+    if (targetSecForMilestones > 0 && elapsedSec >= targetSecForMilestones) {
+      autoFinished.current = true;
+      finish();
+    }
+  }, [superAdmin, done, elapsedSec, targetSecForMilestones, finish]);
+
+  const adjustTime = useCallback(
+    (delta: number) => {
+      setTargetMinutes((t) => Math.max(5, Math.min(600, t + delta)));
+      startAdjust(async () => {
+        const res = await adjustFocusTarget(session.id, delta);
+        if (res.ok) setTargetMinutes(res.targetMinutes);
+      });
+    },
+    [session.id],
+  );
 
   const confirmExit = useCallback(() => {
     const reason = exitReason === "অন্য কারণ" ? exitCustom.trim() || "অন্য কারণ" : exitReason;
@@ -182,7 +210,7 @@ export function FocusScreen({ session }: { session: ActiveSession }) {
     );
   }
 
-  const targetSec = session.targetMinutes * 60;
+  const targetSec = targetMinutes * 60;
   const progress = targetSec > 0 ? elapsedSec / targetSec : 0;
   const overTime = progress >= 1;
   const remainingSec = Math.max(0, targetSec - elapsedSec);
@@ -261,9 +289,37 @@ export function FocusScreen({ session }: { session: ActiveSession }) {
               {overTime ? `+${fmtClock(overSec)}` : fmtClock(remainingSec)}
             </span>
             <span className="mt-1 text-xs text-slate-500 landscape:text-sm">
-              {overTime ? "অতিরিক্ত সময় — লক্ষ্য পার হয়েছে" : `বাকি আছে · লক্ষ্য ${session.targetMinutes} মিনিট`}
+              {overTime
+                ? superAdmin
+                  ? "সম্পন্ন হচ্ছে…"
+                  : "অতিরিক্ত সময় — লক্ষ্য পার হয়েছে"
+                : `বাকি আছে · লক্ষ্য ${targetMinutes} মিনিট`}
             </span>
           </div>
+
+          {superAdmin && !overTime && (
+            <div className="absolute -bottom-12 flex items-center gap-4 landscape:-bottom-16">
+              <button
+                type="button"
+                onClick={() => adjustTime(-5)}
+                disabled={adjustPending || targetMinutes <= 5}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-700 text-lg text-slate-300 transition-transform active:scale-95 disabled:opacity-30"
+                aria-label="৫ মিনিট কমান"
+              >
+                −
+              </button>
+              <span className="text-xs text-slate-500">৫ মিনিট</span>
+              <button
+                type="button"
+                onClick={() => adjustTime(5)}
+                disabled={adjustPending || targetMinutes >= 600}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-700 text-lg text-slate-300 transition-transform active:scale-95 disabled:opacity-30"
+                aria-label="৫ মিনিট বাড়ান"
+              >
+                +
+              </button>
+            </div>
+          )}
 
           {/* Milestone toast — a brief, non-blocking nudge, not a dialog that breaks flow. */}
           {toast && (
