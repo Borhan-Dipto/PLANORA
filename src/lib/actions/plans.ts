@@ -1,9 +1,9 @@
 "use server";
 
-import { and, eq, gte, count, ne } from "drizzle-orm";
+import { and, eq, gte, count, ne, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db, withDbRetry } from "@/db/client";
-import { plans, aiUsageLogs } from "@/db/schema";
+import { plans, planTasks, aiUsageLogs } from "@/db/schema";
 import { requireUserId, isSuperAdmin } from "@/lib/session";
 import {
   analyzePlan,
@@ -60,8 +60,23 @@ async function insertDraft(userId: string, source: Source, data: PlanData) {
   return row.id;
 }
 
-/** Create (planId = null) or update a draft or active plan. Editing an active plan reschedules from today. */
-export async function savePlan(planId: string | null, source: Source, input: unknown): Promise<Result<{ id: string }>> {
+/**
+ * Create (planId = null) or update a draft or active plan. Editing an active plan reschedules
+ * from today.
+ *
+ * `resetProgress` is the "একদম শুরু থেকে শুরু করব" choice offered when the user moves an active
+ * plan's start date: instead of the default (keep whatever's already marked done, just reshuffle
+ * the remainder — Option B), this wipes every study/revision task row for the plan outright — done
+ * ones included — so regenerateSchedule sees zero "spoken" minutes anywhere and rebuilds the whole
+ * cycle from a clean slate (Option A). Open to every user, not super_admin-gated — basic start-date
+ * editing already has no such gate, so this is just a safer way to exercise it, not a new tier of access.
+ */
+export async function savePlan(
+  planId: string | null,
+  source: Source,
+  input: unknown,
+  resetProgress = false
+): Promise<Result<{ id: string }>> {
   const userId = await requireUserId();
   const n = await normalise(userId, input);
   if (!n.ok) return n;
@@ -97,6 +112,13 @@ export async function savePlan(planId: string | null, source: Source, input: unk
       .where(eq(plans.id, planId)),
   );
   if (today !== null) {
+    if (resetProgress) {
+      // Full reset: clear every study/revision row — done and locked ones too — so nothing is
+      // left to count as "already spoken for" when regenerateSchedule rebuilds below.
+      await withDbRetry(() =>
+        db.delete(planTasks).where(and(eq(planTasks.planId, planId), inArray(planTasks.kind, ["study", "revision"]))),
+      );
+    }
     await regenerateSchedule(planId, userId, data, today);
     revalidatePath("/dashboard");
     revalidatePath(`/planner/${planId}/schedule`);

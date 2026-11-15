@@ -55,7 +55,11 @@ export function PlanEditor({
   }));
   const [error, setError] = useState("");
   const [pending, start] = useTransition();
+  const [resetProgress, setResetProgress] = useState(false);
   const { issues, stats } = analyzePlan(plan);
+  // Shown only when the user actually moves an active plan's start date — that's the exact
+  // scenario the choice matters for ("১৫ তারিখ থেকে শুরু করেছিলাম, এখন ১৬ থেকে করব")।
+  const startDateChanged = active && plan.startDate !== initial.startDate;
 
   const set = <K extends keyof PlanData>(k: K, v: PlanData[K]) => setPlan((p) => ({ ...p, [k]: v }));
   const setSubject = (id: string, fn: (s: Subject) => Subject) =>
@@ -70,10 +74,15 @@ export function PlanEditor({
   const save = () =>
     start(async () => {
       setError("");
-      const res = await savePlan(planId, source, {
-        ...plan,
-        dailyTargets: (plan.dailyTargets ?? []).map((x) => x.trim()).filter(Boolean),
-      });
+      const res = await savePlan(
+        planId,
+        source,
+        {
+          ...plan,
+          dailyTargets: (plan.dailyTargets ?? []).map((x) => x.trim()).filter(Boolean),
+        },
+        startDateChanged && resetProgress
+      );
       if (!res.ok) return setError(res.error);
       router.push(`/planner/${res.id}`);
       router.refresh();
@@ -131,6 +140,31 @@ export function PlanEditor({
             />
             {active && (
               <p className="mt-1 text-xs text-muted">চলমান প্ল্যানের শুরুর তারিখ আজ বা তার পরে এগিয়ে দেওয়া যাবে — অতীতে নেওয়া যাবে না।</p>
+            )}
+            {startDateChanged && (
+              <div className="mt-3 space-y-2 rounded-lg border border-warning/40 bg-warning/10 p-3">
+                <p className="text-xs font-medium">শুরুর তারিখ পরিবর্তন করছেন — আগের সম্পন্ন করা পড়া কী করবেন?</p>
+                <label className="flex items-start gap-2 text-sm">
+                  <input
+                    type="radio"
+                    name="resetProgress"
+                    className="mt-1"
+                    checked={!resetProgress}
+                    onChange={() => setResetProgress(false)}
+                  />
+                  <span>যা শেষ হয়েছে তা কমপ্লিট হিসাবে থাকুক, বাকিটা নতুন তারিখ থেকে সাজিয়ে দিই</span>
+                </label>
+                <label className="flex items-start gap-2 text-sm">
+                  <input
+                    type="radio"
+                    name="resetProgress"
+                    className="mt-1"
+                    checked={resetProgress}
+                    onChange={() => setResetProgress(true)}
+                  />
+                  <span>না, একদম শুরু থেকে শুরু করব (আগের সব অগ্রগতি মুছে নতুন করে সাজানো হবে)</span>
+                </label>
+              </div>
             )}
           </div>
           <div>
