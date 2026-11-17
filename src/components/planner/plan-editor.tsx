@@ -56,6 +56,10 @@ export function PlanEditor({
   const [error, setError] = useState("");
   const [pending, start] = useTransition();
   const [resetProgress, setResetProgress] = useState(false);
+  // Raw text buffer for the custom learning-days field — kept separate from plan.learningDays so
+  // clearing the box to type a fresh number (e.g. deleting "30" to type "40") doesn't get the
+  // in-between empty state coerced straight to MIN_LEARNING_DAYS on every keystroke.
+  const [daysText, setDaysText] = useState(String(initial.learningDays));
   const { issues, stats } = analyzePlan(plan);
   // Shown only when the user actually moves an active plan's start date — that's the exact
   // scenario the choice matters for ("১৫ তারিখ থেকে শুরু করেছিলাম, এখন ১৬ থেকে করব")।
@@ -97,11 +101,15 @@ export function PlanEditor({
       )}
       <JsonImport
         onImport={(imported) =>
-          setPlan((p) => ({
-            ...imported,
-            revisionDays: isPremium ? imported.revisionDays : p.revisionDays,
-            learningDays: isSuperAdmin ? imported.learningDays : p.learningDays,
-          }))
+          setPlan((p) => {
+            const learningDays = isSuperAdmin ? imported.learningDays : p.learningDays;
+            setDaysText(String(learningDays));
+            return {
+              ...imported,
+              revisionDays: isPremium ? imported.revisionDays : p.revisionDays,
+              learningDays,
+            };
+          })
         }
       />
 
@@ -194,7 +202,10 @@ export function PlanEditor({
                   <button
                     key={p.days}
                     type="button"
-                    onClick={() => set("learningDays", p.days)}
+                    onClick={() => {
+                      set("learningDays", p.days);
+                      setDaysText(String(p.days));
+                    }}
                     className={`rounded-full border px-3 py-1 text-xs ${
                       plan.learningDays === p.days
                         ? "border-accent bg-accent text-accent-foreground"
@@ -212,10 +223,23 @@ export function PlanEditor({
                 max={MAX_LEARNING_DAYS}
                 step={1}
                 className={`${ui.input} max-w-40`}
-                value={plan.learningDays}
-                onChange={(e) =>
-                  set("learningDays", Math.min(MAX_LEARNING_DAYS, Math.max(MIN_LEARNING_DAYS, Number(e.target.value) || MIN_LEARNING_DAYS)))
-                }
+                value={daysText}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setDaysText(v);
+                  // Let the number flow into the plan live while it's a valid in-range value, but
+                  // don't fight the user mid-edit (empty box, a leading digit, etc.) — those get
+                  // clamped once they leave the field, in onBlur below.
+                  if (v !== "" && /^\d+$/.test(v)) {
+                    const n = Number(v);
+                    if (n >= MIN_LEARNING_DAYS && n <= MAX_LEARNING_DAYS) set("learningDays", n);
+                  }
+                }}
+                onBlur={() => {
+                  const clamped = Math.min(MAX_LEARNING_DAYS, Math.max(MIN_LEARNING_DAYS, Number(daysText) || plan.learningDays));
+                  setDaysText(String(clamped));
+                  set("learningDays", clamped);
+                }}
               />
               <p className="mt-1 text-xs text-muted">
                 কাস্টম সংখ্যা দিন ({MIN_LEARNING_DAYS}–{MAX_LEARNING_DAYS} দিন), অথবা উপরের একটা বেছে নিন।
