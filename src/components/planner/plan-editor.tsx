@@ -296,20 +296,10 @@ export function PlanEditor({
         </p>
       </section>
 
-      <section className={ui.card}>
-        <label className={ui.label}>দৈনিক লক্ষ্য / অভ্যাস (প্রতি লাইনে একটি, ঐচ্ছিক)</label>
-        <textarea
-          className={`${ui.input} min-h-20`}
-          value={(plan.dailyTargets ?? []).join("\n")}
-          placeholder={"প্রতিদিন English Newspaper পড়া\nপ্রতিদিন এক পৃষ্ঠা বাংলা লেখা"}
-          onChange={(e) => set("dailyTargets", e.target.value.split("\n").slice(0, 20))}
-          onBlur={() => set("dailyTargets", (plan.dailyTargets ?? []).map((x) => x.trim()).filter(Boolean))}
-        />
-      </section>
-
       <PlanStatsBar stats={stats} />
 
-      {/* Subjects */}
+      {/* Subjects — this is where topics/chapters with study time go */}
+      <h2 className="pt-1 text-sm font-semibold text-muted">📚 বিষয় ও টপিক</h2>
       {plan.subjects.map((s, idx) => (
         <SubjectCard
           key={s.id}
@@ -323,6 +313,25 @@ export function PlanEditor({
       <button type="button" onClick={addSubject} className={`${ui.btn} ${ui.secondary} w-full border-dashed py-3`}>
         + বিষয় যোগ করুন
       </button>
+
+      {/* Daily habits — intentionally separate from, and below, the subjects above. This box is
+          NOT for topics/chapters (those go in a subject above, with their own study time) — it's
+          only for small recurring daily habits with no time tracking, like reading a newspaper. */}
+      <section className={ui.card}>
+        <h2 className="font-semibold">🔁 দৈনিক অভ্যাস (ঐচ্ছিক)</h2>
+        <p className="mt-1 text-xs text-muted">
+          এটা বিষয়/টপিক দেওয়ার জায়গা না — উপরে &ldquo;বিষয় যোগ করুন&rdquo;-এ আপনার টপিকগুলো দিন। এখানে শুধু ছোট ছোট দৈনিক অভ্যাস
+          লিখুন যেগুলোর আলাদা পড়ার সময় হিসাব করার দরকার নেই।
+        </p>
+        <label className={`${ui.label} mt-3`}>প্রতি লাইনে একটি অভ্যাস লিখুন</label>
+        <textarea
+          className={`${ui.input} min-h-20`}
+          value={(plan.dailyTargets ?? []).join("\n")}
+          placeholder={"প্রতিদিন English Newspaper পড়া\nপ্রতিদিন এক পৃষ্ঠা বাংলা লেখা"}
+          onChange={(e) => set("dailyTargets", e.target.value.split("\n").slice(0, 20))}
+          onBlur={() => set("dailyTargets", (plan.dailyTargets ?? []).map((x) => x.trim()).filter(Boolean))}
+        />
+      </section>
 
       <IssueList issues={issues} />
 
