@@ -16,6 +16,7 @@ import { RescheduleBanner } from "@/components/schedule/reschedule-button";
 import { TakeBreakButton } from "@/components/schedule/take-break-button";
 import { CancelBreakButton } from "@/components/schedule/cancel-break-button";
 import { CompleteTodayButton } from "@/components/schedule/complete-today-button";
+import { CustomTimerButton } from "@/components/focus/custom-timer-button";
 import { LiveTimeBudget } from "@/components/schedule/live-time-budget";
 import { LiveClock } from "@/components/live-clock";
 import { ui, fmtMinutes } from "@/components/ui";
@@ -45,6 +46,20 @@ export default async function DashboardPage() {
     body = (
       <div className="mt-6 space-y-4">
         <LiveClock className={ui.card} />
+        {focusSession ? (
+          <Link
+            href="/focus"
+            className="flex items-center gap-3 rounded-xl border border-accent/40 bg-accent/10 p-4 hover:border-accent"
+          >
+            <span className="text-2xl">▶</span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-medium">ফোকাস মোড চলছে: {focusSession.title}</span>
+              <span className="block text-xs text-muted">ফিরে গিয়ে চালিয়ে যান — সময় গণনা চলছেই</span>
+            </span>
+          </Link>
+        ) : (
+          <CustomTimerButton />
+        )}
         <div className={`${ui.card} text-center text-muted`}>
           <p>{dict.dashboard.noPlan}</p>
           <p className="mt-1 text-sm">{dict.dashboard.noPlanHint}</p>
@@ -95,7 +110,7 @@ export default async function DashboardPage() {
           </p>
         </Link>
 
-        {focusSession && (
+        {focusSession ? (
           <Link
             href="/focus"
             className="flex items-center gap-3 rounded-xl border border-accent/40 bg-accent/10 p-4 hover:border-accent"
@@ -106,6 +121,8 @@ export default async function DashboardPage() {
               <span className="block text-xs text-muted">ফিরে গিয়ে চালিয়ে যান — সময় গণনা চলছেই</span>
             </span>
           </Link>
+        ) : (
+          <CustomTimerButton />
         )}
 
         <RescheduleBanner planId={active.id} missed={missed} />

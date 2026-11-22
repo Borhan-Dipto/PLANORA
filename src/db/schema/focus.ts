@@ -16,7 +16,9 @@ export const focusSessions = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     userId: uuid("user_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
-    planId: uuid("plan_id").notNull().references(() => plans.id, { onDelete: "cascade" }),
+    // Nullable: a "কাস্টম টাইমার" (ad-hoc) session has no plan or task behind it at all — just a
+    // title and a target time the user types in on the spot.
+    planId: uuid("plan_id").references(() => plans.id, { onDelete: "cascade" }),
     taskId: uuid("task_id").references(() => planTasks.id, { onDelete: "set null" }),
     title: text("title").notNull(),
     subjectName: text("subject_name"),

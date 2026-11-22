@@ -45,10 +45,13 @@ function fmtClock(totalSeconds: number) {
     : `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
 }
 
-/** super_admin-only for now (premium feature): the timer auto-completes the moment its target
- * elapses, and a +/- 5-minute adjuster sits under the ring. Everyone else keeps the existing
- * manual-finish behavior (countdown runs into "overtime" until they tap "পড়া শেষ করেছি"). */
+/** Auto-complete-at-target + the +/- 5-minute adjuster are super_admin-only for now (premium
+ * feature) on a plan-task session — everyone else keeps the manual-finish behavior there
+ * (countdown runs into "overtime" until they tap "পড়া শেষ করেছি"). A কাস্টম টাইমার session
+ * (session.taskId === null — see /focus/custom) always gets both: it's not a plan-scheduling
+ * feature being gated, just a stopwatch, so it always ends itself at target like the user asked. */
 export function FocusScreen({ session, superAdmin = false }: { session: ActiveSession; superAdmin?: boolean }) {
+  const autoCompleteEnabled = superAdmin || !session.taskId;
   const router = useRouter();
   // Lazy initializer runs once and the value is never reassigned — stable across re-renders
   // without touching a ref during render (which React now flags).
@@ -163,12 +166,12 @@ export function FocusScreen({ session, superAdmin = false }: { session: ActiveSe
   // against firing twice (e.g. a re-render landing exactly on the threshold again).
   const autoFinished = useRef(false);
   useEffect(() => {
-    if (!superAdmin || done || autoFinished.current) return;
+    if (!autoCompleteEnabled || done || autoFinished.current) return;
     if (targetSecForMilestones > 0 && elapsedSec >= targetSecForMilestones) {
       autoFinished.current = true;
       finish();
     }
-  }, [superAdmin, done, elapsedSec, targetSecForMilestones, finish]);
+  }, [autoCompleteEnabled, done, elapsedSec, targetSecForMilestones, finish]);
 
   const adjustTime = useCallback(
     (delta: number) => {
@@ -290,14 +293,14 @@ export function FocusScreen({ session, superAdmin = false }: { session: ActiveSe
             </span>
             <span className="mt-1 text-xs text-slate-500 landscape:text-sm">
               {overTime
-                ? superAdmin
+                ? autoCompleteEnabled
                   ? "সম্পন্ন হচ্ছে…"
                   : "অতিরিক্ত সময় — লক্ষ্য পার হয়েছে"
                 : `বাকি আছে · লক্ষ্য ${targetMinutes} মিনিট`}
             </span>
           </div>
 
-          {superAdmin && !overTime && (
+          {autoCompleteEnabled && !overTime && (
             <div className="absolute -bottom-12 flex items-center gap-4 landscape:-bottom-16">
               <button
                 type="button"

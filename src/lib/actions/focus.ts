@@ -10,7 +10,7 @@ const MAX_FOCUS_TARGET = 600;
 
 export type ActiveSession = {
   id: string;
-  planId: string;
+  planId: string | null;
   taskId: string | null;
   title: string;
   subjectName: string | null;
@@ -73,6 +73,46 @@ export async function startFocusSession(taskId: string): Promise<{ ok: true; ses
   return winner ? { ok: true, session: toSession(winner) } : { ok: false, error: "ফোকাস সেশন শুরু করা যায়নি, আবার চেষ্টা করুন" };
 }
 
+/**
+ * "কাস্টম টাইমার" — a free-standing focus session with no plan/task behind it at all: any user,
+ * any time, any title and any target length they type in on the spot (e.g. "বাংলাদেশ ও বিশ্ব
+ * পরিচয় বই পড়া", 50 মিনিট). Reuses the exact same FocusScreen UI and server-clock mechanics as a
+ * plan-task session — it just has planId/taskId = null, and (unlike a task session, which needs
+ * super_admin for now) always auto-completes at target and always allows the +/- adjuster, since
+ * there's no "premium" task-scheduling feature being gated here, just a stopwatch.
+ */
+export async function startCustomFocusSession(
+  title: string,
+  targetMinutes: number
+): Promise<{ ok: true; session: ActiveSession } | { ok: false; error: string }> {
+  const userId = await requireUserId();
+
+  const [existing] = await withDbRetry(() =>
+    db.select().from(focusSessions).where(and(eq(focusSessions.userId, userId), eq(focusSessions.status, "active"))),
+  );
+  if (existing) return { ok: true, session: toSession(existing) };
+
+  const cleanTitle = title.trim().slice(0, 120);
+  if (!cleanTitle) return { ok: false, error: "সেশনের একটা নাম দিন (যেমন: বাংলাদেশ ও বিশ্ব পরিচয় বই পড়া)" };
+  const minutes = Math.round(targetMinutes);
+  if (!Number.isFinite(minutes) || minutes < MIN_FOCUS_TARGET || minutes > MAX_FOCUS_TARGET)
+    return { ok: false, error: `সময় ${MIN_FOCUS_TARGET}–${MAX_FOCUS_TARGET} মিনিটের মধ্যে দিন` };
+
+  const [session] = await withDbRetry(() =>
+    db
+      .insert(focusSessions)
+      .values({ userId, planId: null, taskId: null, title: cleanTitle, subjectName: null, targetMinutes: minutes })
+      // Same race guard as startFocusSession above.
+      .onConflictDoNothing()
+      .returning(),
+  );
+  if (session) return { ok: true, session: toSession(session) };
+  const [winner] = await withDbRetry(() =>
+    db.select().from(focusSessions).where(and(eq(focusSessions.userId, userId), eq(focusSessions.status, "active"))),
+  );
+  return winner ? { ok: true, session: toSession(winner) } : { ok: false, error: "টাইমার শুরু করা যায়নি, আবার চেষ্টা করুন" };
+}
+
 export async function getActiveFocusSession(): Promise<ActiveSession | null> {
   const userId = await requireUserId();
   const [s] = await withDbRetry(() =>
@@ -128,16 +168,25 @@ export async function completeFocusSession(sessionId: string) {
 /**
  * +/- 5-minute adjustment to a running session's own target (session.targetMinutes only — the
  * underlying plan task's scheduled minutes is untouched, so this doesn't retroactively change
- * future scheduling). Super_admin-only for now, as a premium feature; opening it to paying
- * premium users later is a one-line change here (same gate pattern as resolveLearningDays/
- * takeBreak). Clamp + increment happen atomically in SQL so rapid +/- taps can't race each other
- * into an inconsistent value.
+ * future scheduling). Super_admin-only for now, as a premium feature, for a plan-task session;
+ * opening it to paying premium users later is a one-line change here (same gate pattern as
+ * resolveLearningDays/takeBreak). A কাস্টম টাইমার session (taskId === null) has no such gate —
+ * it's not a plan-scheduling feature, just a stopwatch anyone can adjust. Clamp + increment
+ * happen atomically in SQL so rapid +/- taps can't race each other into an inconsistent value.
  */
 export async function adjustFocusTarget(sessionId: string, deltaMinutes: number) {
   const userId = await requireUserId();
-  if (!(await isSuperAdmin(userId))) return { ok: false as const, error: "এই ফিচারটি এখনো শুধু সুপার অ্যাডমিনের জন্য" };
   const delta = Math.round(deltaMinutes);
   if (!delta) return { ok: false as const, error: "সময় পরিবর্তন করা যায়নি" };
+
+  const [current] = await withDbRetry(() =>
+    db
+      .select({ taskId: focusSessions.taskId })
+      .from(focusSessions)
+      .where(and(eq(focusSessions.id, sessionId), eq(focusSessions.userId, userId), eq(focusSessions.status, "active"))),
+  );
+  if (!current) return { ok: false as const, error: "সেশনটি পাওয়া যায়নি" };
+  if (current.taskId && !(await isSuperAdmin(userId))) return { ok: false as const, error: "এই ফিচারটি এখনো শুধু সুপার অ্যাডমিনের জন্য" };
 
   const [updated] = await withDbRetry(() =>
     db
