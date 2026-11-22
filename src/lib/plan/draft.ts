@@ -24,6 +24,10 @@ export const aiDraftSchema = z.object({
         name: z.string().catch(""),
         course: z.string().catch(""),
         priority: z.number().catch(3),
+        /** 0 = Sunday … 6 = Saturday. Empty/omitted = every one of the plan's study days. */
+        weekdays: z.array(z.number()).catch([]),
+        /** "অবশ্যই পড়তে হবে" — always scheduled ahead of non-mandatory subjects. */
+        mandatory: z.boolean().catch(false),
         topics: z.array(topicIn).catch([]),
       })
     )
@@ -56,8 +60,8 @@ export function draftToPlan(d: AiDraft, learningDays: number = LEARNING_DAYS): P
       name: s.name.trim().slice(0, 120),
       course: s.course.trim().slice(0, 200),
       priority: clamp(s.priority, 1, 5),
-      weekdays: [] as number[],
-      mandatory: false,
+      weekdays: [...new Set(s.weekdays.filter((n) => Number.isInteger(n) && n >= 0 && n <= 6))].sort(),
+      mandatory: s.mandatory,
       topics: s.topics
         .filter((t) => t.name.trim())
         .slice(0, 300)

@@ -5,10 +5,14 @@ import { MAX_REVISION_DAYS, MIN_REVISION_DAYS, MIN_LEARNING_DAYS, MAX_LEARNING_D
  * PLANORA exchange format (what users import/export and what the master prompt asks chatbots to produce):
  * {
  *   plan_name, goal, learning_days: 30, exam_date?, daily_study_minutes?, study_weekdays?,
- *   subjects: [{ name, course?, priority?, topics: ["…" | { name, difficulty, estimated_minutes }] }],
+ *   subjects: [{ name, course?, priority?, weekdays?, mandatory?,
+ *                topics: ["…" | { name, difficulty, estimated_minutes }] }],
  *   daily_targets?: { key: value } | ["…"],
  *   revision_phase?: { duration_days }
  * }
+ * `weekdays` (per subject, same 0–6 numbering as `study_weekdays`) and `mandatory` mirror the two
+ * super_admin-only plan-editor fields added after v1 — both optional, both default to "off"
+ * (every study day / not mandatory) when omitted, so older exported JSON keeps importing as-is.
  */
 export const MASTER_PROMPT = `তুমি একজন অভিজ্ঞ স্টাডি প্ল্যানার। আমি PLANORA অ্যাপে একটি ৩০ দিনের স্টাডি প্ল্যান ইমপোর্ট করব।
 আমি নিচে বলছি কী কী পড়তে চাই — সেটা থেকে নিচের "PLANORA JSON" ফরম্যাটে একটি JSON বানিয়ে দাও।
@@ -29,6 +33,10 @@ export const MASTER_PROMPT = `তুমি একজন অভিজ্ঞ স�
    - "name": বিষয় বা কোর্সের নাম (যেমন "বাংলা — ৩১তম বাংলা জব ব্যাচ")
    - "course": কোর্স/ব্যাচের নাম থাকলে, না থাকলে বাদ দাও
    - "priority": 1 (কম) থেকে 5 (সবচেয়ে বেশি) — বেশি নম্বরের বা দুর্বল বিষয়ে বেশি
+   - "weekdays" (ঐচ্ছিক): এই বিষয়টা শুধু নির্দিষ্ট কিছু দিনে পড়তে চাইলে দিন — যেমন [1, 3, 5] (সোম/বুধ/শুক্র)।
+     0=রবি, 1=সোম, 2=মঙ্গল, 3=বুধ, 4=বৃহস্পতি, 5=শুক্র, 6=শনি। না দিলে বা খালি রাখলে প্রতিদিন।
+   - "mandatory" (ঐচ্ছিক, true/false): এই বিষয়টা "অবশ্যই" পড়তে হবে এমন হলে true দাও — দিনের সময় কমে গেলেও
+     এটা বাদ পড়বে না, অন্য কম-জরুরি বিষয়গুলো আগে পেছানো হবে। না দিলে false (ডিফল্ট)।
    - "topics": পড়ার একক — ক্লাস, লেকচার, অধ্যায় বা সিলেবাস-অংশ — ক্রমানুসারে।
      আমি লিস্ট দিলে হুবহু সেই লিস্ট ও ক্রম রাখবে, নিজে থেকে বাদ দেবে না।
      লিস্ট না দিলে অফিসিয়াল সিলেবাস অনুযায়ী নিজে ভাগ করবে (প্রতি বিষয়ে সাধারণত ৫–১৫টি)।
@@ -54,6 +62,7 @@ export const MASTER_PROMPT = `তুমি একজন অভিজ্ঞ স�
       "name": "বাংলা — ৩১তম বাংলা জব ব্যাচ",
       "course": "Complete 40 Lecture Course",
       "priority": 5,
+      "mandatory": true,
       "topics": [
         "ক্লাস-০১: বাংলা সাহিত্যের যুগ বিভাজন, চর্যাপদ",
         "ক্লাস-০২: অন্ধকার যুগ, শ্রীকৃষ্ণকীর্তন, বৈষ্ণব পদাবলী"
@@ -62,6 +71,7 @@ export const MASTER_PROMPT = `তুমি একজন অভিজ্ঞ স�
     {
       "name": "গণিত — জব ম্যাথ কোর্স",
       "priority": 4,
+      "weekdays": [1, 3, 5],
       "topics": [
         "Number — Class 1",
         { "name": "Logarithm", "difficulty": "hard", "estimated_minutes": 120 }
@@ -109,6 +119,11 @@ function normalise(raw: Obj) {
         name: str(pick(s, "name", "subject", "title")),
         course: str(s.course),
         priority: Number.isFinite(num(s.priority)) ? num(s.priority) : 3,
+        weekdays: (() => {
+          const w = pick(s, "weekdays", "study_days", "studyDays");
+          return Array.isArray(w) ? w.map(num).filter((n) => Number.isInteger(n) && n >= 0 && n <= 6) : [];
+        })(),
+        mandatory: pick(s, "mandatory", "must_study", "mustStudy") === true,
         topics: (Array.isArray(s.topics) ? s.topics : []).map((t) =>
           isObj(t)
             ? {
@@ -174,6 +189,8 @@ export function planToJson(plan: PlanData) {
       name: s.name,
       ...(s.course ? { course: s.course } : {}),
       priority: s.priority,
+      ...(s.weekdays?.length ? { weekdays: s.weekdays } : {}),
+      ...(s.mandatory ? { mandatory: true } : {}),
       topics: s.topics.map((t) =>
         t.difficulty === "medium" ? t.name : { name: t.name, difficulty: t.difficulty, estimated_minutes: t.estimatedMinutes }
       ),
