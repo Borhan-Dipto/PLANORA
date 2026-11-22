@@ -73,6 +73,8 @@ export function buildSchedule(
       weight: Math.max(1, s.priority),
       /** 0-6, empty = every study day ("প্রতিদিন"). */
       weekdays: s.weekdays ?? [],
+      /** "অবশ্যই পড়তে হবে" — always picked ahead of non-mandatory subjects on a live day. */
+      mandatory: s.mandatory ?? false,
       vt: 0,
       topics: s.topics
         .map((t) => {
@@ -146,7 +148,10 @@ export function buildSchedule(
       // Once today already has at least one topic and its paced share is used up, stop — the
       // next topic goes to tomorrow instead.
       if (!last && usedToday > 0 && usedToday >= paced) break;
-      live.sort((a, b) => a.vt - b.vt || b.weight - a.weight || a.idx - b.idx);
+      // Mandatory subjects go first — among themselves and against non-mandatory ones — so a
+      // "অবশ্যই" subject's topic is always this round's pick whenever it's live, including the
+      // day's very first pick (which alone bypasses the cap check below, guaranteeing it a slot).
+      live.sort((a, b) => Number(b.mandatory) - Number(a.mandatory) || a.vt - b.vt || b.weight - a.weight || a.idx - b.idx);
       const q = live[0];
       const t = q.topics[0];
       // Never split a topic across days — whatever starts today finishes today. But also never

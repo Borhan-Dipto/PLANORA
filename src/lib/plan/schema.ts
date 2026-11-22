@@ -30,6 +30,10 @@ export const subjectSchema = z.object({
   priority: z.coerce.number().int().min(1).max(5).default(3),
   /** 0 = Sunday … 6 = Saturday. Empty ⇒ every one of the plan's own study days ("প্রতিদিন"). */
   weekdays: z.array(z.number().int().min(0).max(6)).max(7).optional().default([]),
+  /** "অবশ্যই পড়তে হবে" — on a live day (one its weekdays allow), this subject's next topic is
+   * always picked before any non-mandatory subject's, so it never gets edged out by the normal
+   * priority/round-robin ordering. See the `live.sort` in buildSchedule (engine.ts). */
+  mandatory: z.boolean().optional().default(false),
   topics: z.array(topicSchema).max(300),
 });
 

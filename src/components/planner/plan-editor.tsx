@@ -72,7 +72,7 @@ export function PlanEditor({
   const addSubject = () =>
     setPlan((p) => ({
       ...p,
-      subjects: [...p.subjects, { id: newId(), name: "", course: "", priority: 3, weekdays: [], topics: [] }],
+      subjects: [...p.subjects, { id: newId(), name: "", course: "", priority: 3, weekdays: [], mandatory: false, topics: [] }],
     }));
 
   const save = () =>
@@ -445,53 +445,29 @@ function SubjectCard({
         {subject.weekdays.length > 0 && (
           <p className="mt-1 text-xs text-muted">সপ্তাহে {subject.weekdays.length} দিন — বাকি দিনগুলোয় এই বিষয়টা আসবে না</p>
         )}
+        <label className="mt-3 flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={subject.mandatory ?? false}
+            onChange={(e) => onChange((s) => ({ ...s, mandatory: e.target.checked }))}
+          />
+          <span>
+            ✅ এই বিষয়টা <b>অবশ্যই</b> পড়তে হবে — প্রতিদিন (বা বাছাই করা দিনে) এটাকে সবার আগে জায়গা দেওয়া হবে, অন্য বিষয়ের
+            কারণে এটা বাদ পড়বে না
+          </span>
+        </label>
       </div>
 
       <div className="mt-4 space-y-2">
         {subject.topics.map((t, i) => (
-          <div key={t.id} className="flex flex-wrap items-center gap-2 rounded-lg bg-background p-2 sm:flex-nowrap">
-            <span className="hidden w-6 text-center text-xs text-muted sm:block">{i + 1}</span>
-            <input
-              className={`${ui.input} basis-full sm:basis-auto sm:flex-1`}
-              value={t.name}
-              maxLength={200}
-              placeholder="টপিক / অধ্যায়"
-              onChange={(e) => setTopic(t.id, { name: e.target.value })}
-            />
-            <select
-              className={`${ui.input} flex-1 sm:w-28 sm:flex-none`}
-              value={t.difficulty}
-              onChange={(e) => setTopic(t.id, { difficulty: e.target.value as Topic["difficulty"] })}
-            >
-              {(Object.keys(DIFFICULTY_LABEL) as Topic["difficulty"][]).map((d) => (
-                <option key={d} value={d}>
-                  {DIFFICULTY_LABEL[d]}
-                </option>
-              ))}
-            </select>
-            <div className="flex flex-1 items-center gap-1 sm:w-28 sm:flex-none">
-              <input
-                type="number"
-                inputMode="numeric"
-                min={10}
-                max={1200}
-                step={10}
-                className={ui.input}
-                value={t.estimatedMinutes}
-                aria-label="আনুমানিক মিনিট"
-                onChange={(e) => setTopic(t.id, { estimatedMinutes: Number(e.target.value || 0) })}
-              />
-              <span className="text-xs text-muted">মি.</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => onChange((s) => ({ ...s, topics: s.topics.filter((x) => x.id !== t.id) }))}
-              className={`${ui.btn} ${ui.ghost} px-2`}
-              aria-label="টপিক মুছুন"
-            >
-              ✕
-            </button>
-          </div>
+          <TopicRow
+            key={t.id}
+            index={i}
+            topic={t}
+            onChange={(patch) => setTopic(t.id, patch)}
+            onRemove={() => onChange((s) => ({ ...s, topics: s.topics.filter((x) => x.id !== t.id) }))}
+          />
         ))}
       </div>
 
@@ -537,5 +513,88 @@ function SubjectCard({
         </span>
       </div>
     </section>
+  );
+}
+
+/**
+ * One topic's editor row — split into a clearly-labelled name line and a settings line (কঠিনতা /
+ * সময়) so it's obvious at a glance which box is for the time. The minutes field keeps its own raw
+ * text buffer (same fix as the super-admin learning-days field) so clearing it to type a new
+ * number doesn't get coerced back to a default mid-keystroke.
+ */
+function TopicRow({
+  index,
+  topic,
+  onChange,
+  onRemove,
+}: {
+  index: number;
+  topic: Topic;
+  onChange: (patch: Partial<Topic>) => void;
+  onRemove: () => void;
+}) {
+  const [minutesText, setMinutesText] = useState(String(topic.estimatedMinutes));
+
+  return (
+    <div className="rounded-lg bg-background p-2.5">
+      <div className="flex items-center gap-2">
+        <span className="w-5 shrink-0 text-center text-xs text-muted">{index + 1}</span>
+        <input
+          className={`${ui.input} flex-1`}
+          value={topic.name}
+          maxLength={200}
+          placeholder="টপিক / অধ্যায়ের নাম"
+          onChange={(e) => onChange({ name: e.target.value })}
+        />
+        <button type="button" onClick={onRemove} className={`${ui.btn} ${ui.ghost} shrink-0 px-2`} aria-label="টপিক মুছুন">
+          ✕
+        </button>
+      </div>
+      <div className="mt-2 flex flex-wrap items-end gap-3 pl-7">
+        <div>
+          <label className="mb-1 block text-[11px] text-muted">কঠিনতা</label>
+          <select
+            className={`${ui.input} w-28`}
+            value={topic.difficulty}
+            onChange={(e) => onChange({ difficulty: e.target.value as Topic["difficulty"] })}
+          >
+            {(Object.keys(DIFFICULTY_LABEL) as Topic["difficulty"][]).map((d) => (
+              <option key={d} value={d}>
+                {DIFFICULTY_LABEL[d]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-[11px] text-muted">⏱️ পড়তে কত মিনিট লাগবে</label>
+          <div className="flex items-center gap-1.5">
+            <input
+              type="number"
+              inputMode="numeric"
+              min={10}
+              max={1200}
+              step={10}
+              className={`${ui.input} w-24`}
+              value={minutesText}
+              aria-label="আনুমানিক মিনিট"
+              onChange={(e) => {
+                const v = e.target.value;
+                setMinutesText(v);
+                if (v !== "" && /^\d+$/.test(v)) {
+                  const n = Number(v);
+                  if (n >= 10 && n <= 1200) onChange({ estimatedMinutes: n });
+                }
+              }}
+              onBlur={() => {
+                const clamped = Math.min(1200, Math.max(10, Number(minutesText) || topic.estimatedMinutes));
+                setMinutesText(String(clamped));
+                onChange({ estimatedMinutes: clamped });
+              }}
+            />
+            <span className="text-xs text-muted">মিনিট</span>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

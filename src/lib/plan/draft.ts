@@ -57,6 +57,7 @@ export function draftToPlan(d: AiDraft, learningDays: number = LEARNING_DAYS): P
       course: s.course.trim().slice(0, 200),
       priority: clamp(s.priority, 1, 5),
       weekdays: [] as number[],
+      mandatory: false,
       topics: s.topics
         .filter((t) => t.name.trim())
         .slice(0, 300)
