@@ -363,6 +363,18 @@ function SubjectCard({
   const [showBulk, setShowBulk] = useState(false);
   const total = subject.topics.reduce((n, t) => n + t.estimatedMinutes, 0);
 
+  // Multi-select mode: pick several topics with checkboxes, then move the whole group up/down
+  // together in one go, instead of clicking ▲▼ on each one individually.
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const toggleSelected = (id: string) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
   const setTopic = (id: string, patch: Partial<Topic>) =>
     onChange((s) => ({ ...s, topics: s.topics.map((t) => (t.id === id ? { ...t, ...patch } : t)) }));
   // Topic array order = study order (buildSchedule always consumes topics[0] first per subject),
@@ -376,6 +388,29 @@ function SubjectCard({
       [topics[i], topics[j]] = [topics[j], topics[i]];
       return { ...s, topics };
     });
+  // Moves every selected topic up (or down) by one slot in a single pass, keeping the selected
+  // group's relative order intact — e.g. selecting 3 scattered topics and hitting ▲ once brings
+  // all 3 up past their nearest unselected neighbour, instead of needing 3 separate ▲ clicks.
+  const moveSelected = (dir: -1 | 1) => {
+    if (!selectedIds.size) return;
+    onChange((s) => {
+      const topics = [...s.topics];
+      if (dir === -1) {
+        for (let i = 1; i < topics.length; i++) {
+          if (selectedIds.has(topics[i].id) && !selectedIds.has(topics[i - 1].id)) {
+            [topics[i - 1], topics[i]] = [topics[i], topics[i - 1]];
+          }
+        }
+      } else {
+        for (let i = topics.length - 2; i >= 0; i--) {
+          if (selectedIds.has(topics[i].id) && !selectedIds.has(topics[i + 1].id)) {
+            [topics[i], topics[i + 1]] = [topics[i + 1], topics[i]];
+          }
+        }
+      }
+      return { ...s, topics };
+    });
+  };
   const addTopics = (names: string[]) =>
     onChange((s) => ({
       ...s,
@@ -480,6 +515,41 @@ function SubjectCard({
       </div>
 
       <div className="mt-4 space-y-2">
+        {subject.topics.length > 1 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              className={`${ui.btn} ${ui.ghost} text-xs`}
+              onClick={() => {
+                setSelectMode((on) => !on);
+                setSelectedIds(new Set());
+              }}
+            >
+              {selectMode ? "✕ সিলেকশন বাতিল" : "☑️ একসাথে কয়েকটা সিলেক্ট করুন"}
+            </button>
+            {selectMode && (
+              <>
+                <span className="text-xs text-muted">{selectedIds.size} টি সিলেক্ট করা</span>
+                <button
+                  type="button"
+                  disabled={!selectedIds.size}
+                  onClick={() => moveSelected(-1)}
+                  className={`${ui.btn} ${ui.secondary} px-2.5 py-1 text-xs disabled:opacity-40`}
+                >
+                  ▲ উপরে নিন
+                </button>
+                <button
+                  type="button"
+                  disabled={!selectedIds.size}
+                  onClick={() => moveSelected(1)}
+                  className={`${ui.btn} ${ui.secondary} px-2.5 py-1 text-xs disabled:opacity-40`}
+                >
+                  ▼ নিচে নিন
+                </button>
+              </>
+            )}
+          </div>
+        )}
         {subject.topics.map((t, i) => (
           <TopicRow
             key={t.id}
@@ -489,12 +559,25 @@ function SubjectCard({
             canMoveDown={i < subject.topics.length - 1}
             onMoveUp={() => moveTopic(t.id, -1)}
             onMoveDown={() => moveTopic(t.id, 1)}
+            selectMode={selectMode}
+            selected={selectedIds.has(t.id)}
+            onToggleSelected={() => toggleSelected(t.id)}
             onChange={(patch) => setTopic(t.id, patch)}
-            onRemove={() => onChange((s) => ({ ...s, topics: s.topics.filter((x) => x.id !== t.id) }))}
+            onRemove={() => {
+              setSelectedIds((prev) => {
+                if (!prev.has(t.id)) return prev;
+                const next = new Set(prev);
+                next.delete(t.id);
+                return next;
+              });
+              onChange((s) => ({ ...s, topics: s.topics.filter((x) => x.id !== t.id) }));
+            }}
           />
         ))}
         {subject.topics.length > 1 && (
-          <p className="text-xs text-muted">↕️ টপিকের ক্রম = পড়ার ক্রম — উপর-নিচ বাটনে সাজিয়ে নিন কোনটা আগে পড়বেন</p>
+          <p className="text-xs text-muted">
+            ↕️ টপিকের ক্রম = পড়ার ক্রম — উপর-নিচ বাটনে সাজিয়ে নিন, বা একসাথে কয়েকটা সিলেক্ট করে একবারে উপর-নিচ করুন
+          </p>
         )}
       </div>
 
@@ -556,6 +639,9 @@ function TopicRow({
   canMoveDown,
   onMoveUp,
   onMoveDown,
+  selectMode,
+  selected,
+  onToggleSelected,
   onChange,
   onRemove,
 }: {
@@ -565,35 +651,48 @@ function TopicRow({
   canMoveDown: boolean;
   onMoveUp: () => void;
   onMoveDown: () => void;
+  selectMode: boolean;
+  selected: boolean;
+  onToggleSelected: () => void;
   onChange: (patch: Partial<Topic>) => void;
   onRemove: () => void;
 }) {
   const [minutesText, setMinutesText] = useState(String(topic.estimatedMinutes));
 
   return (
-    <div className="rounded-lg bg-background p-2.5">
+    <div className={`rounded-lg p-2.5 ${selectMode && selected ? "bg-accent/10 ring-1 ring-accent" : "bg-background"}`}>
       <div className="flex items-center gap-2">
         <span className="w-5 shrink-0 text-center text-xs text-muted">{index + 1}</span>
-        <div className="flex shrink-0 flex-col">
-          <button
-            type="button"
-            disabled={!canMoveUp}
-            onClick={onMoveUp}
-            aria-label="টপিক উপরে নিন"
-            className="flex h-4 w-5 items-center justify-center rounded text-[10px] leading-none text-muted hover:bg-border disabled:opacity-25"
-          >
-            ▲
-          </button>
-          <button
-            type="button"
-            disabled={!canMoveDown}
-            onClick={onMoveDown}
-            aria-label="টপিক নিচে নিন"
-            className="flex h-4 w-5 items-center justify-center rounded text-[10px] leading-none text-muted hover:bg-border disabled:opacity-25"
-          >
-            ▼
-          </button>
-        </div>
+        {selectMode ? (
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={onToggleSelected}
+            aria-label="টপিক সিলেক্ট করুন"
+            className="h-4 w-4 shrink-0"
+          />
+        ) : (
+          <div className="flex shrink-0 flex-col">
+            <button
+              type="button"
+              disabled={!canMoveUp}
+              onClick={onMoveUp}
+              aria-label="টপিক উপরে নিন"
+              className="flex h-4 w-5 items-center justify-center rounded text-[10px] leading-none text-muted hover:bg-border disabled:opacity-25"
+            >
+              ▲
+            </button>
+            <button
+              type="button"
+              disabled={!canMoveDown}
+              onClick={onMoveDown}
+              aria-label="টপিক নিচে নিন"
+              className="flex h-4 w-5 items-center justify-center rounded text-[10px] leading-none text-muted hover:bg-border disabled:opacity-25"
+            >
+              ▼
+            </button>
+          </div>
+        )}
         <input
           className={`${ui.input} flex-1`}
           value={topic.name}
