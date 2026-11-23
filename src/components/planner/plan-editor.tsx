@@ -365,6 +365,17 @@ function SubjectCard({
 
   const setTopic = (id: string, patch: Partial<Topic>) =>
     onChange((s) => ({ ...s, topics: s.topics.map((t) => (t.id === id ? { ...t, ...patch } : t)) }));
+  // Topic array order = study order (buildSchedule always consumes topics[0] first per subject),
+  // so moving a topic up/down here is the whole feature — no separate "order" field needed.
+  const moveTopic = (id: string, dir: -1 | 1) =>
+    onChange((s) => {
+      const i = s.topics.findIndex((t) => t.id === id);
+      const j = i + dir;
+      if (i < 0 || j < 0 || j >= s.topics.length) return s;
+      const topics = [...s.topics];
+      [topics[i], topics[j]] = [topics[j], topics[i]];
+      return { ...s, topics };
+    });
   const addTopics = (names: string[]) =>
     onChange((s) => ({
       ...s,
@@ -474,10 +485,17 @@ function SubjectCard({
             key={t.id}
             index={i}
             topic={t}
+            canMoveUp={i > 0}
+            canMoveDown={i < subject.topics.length - 1}
+            onMoveUp={() => moveTopic(t.id, -1)}
+            onMoveDown={() => moveTopic(t.id, 1)}
             onChange={(patch) => setTopic(t.id, patch)}
             onRemove={() => onChange((s) => ({ ...s, topics: s.topics.filter((x) => x.id !== t.id) }))}
           />
         ))}
+        {subject.topics.length > 1 && (
+          <p className="text-xs text-muted">↕️ টপিকের ক্রম = পড়ার ক্রম — উপর-নিচ বাটনে সাজিয়ে নিন কোনটা আগে পড়বেন</p>
+        )}
       </div>
 
       {showBulk && (
@@ -534,11 +552,19 @@ function SubjectCard({
 function TopicRow({
   index,
   topic,
+  canMoveUp,
+  canMoveDown,
+  onMoveUp,
+  onMoveDown,
   onChange,
   onRemove,
 }: {
   index: number;
   topic: Topic;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
   onChange: (patch: Partial<Topic>) => void;
   onRemove: () => void;
 }) {
@@ -548,6 +574,26 @@ function TopicRow({
     <div className="rounded-lg bg-background p-2.5">
       <div className="flex items-center gap-2">
         <span className="w-5 shrink-0 text-center text-xs text-muted">{index + 1}</span>
+        <div className="flex shrink-0 flex-col">
+          <button
+            type="button"
+            disabled={!canMoveUp}
+            onClick={onMoveUp}
+            aria-label="টপিক উপরে নিন"
+            className="flex h-4 w-5 items-center justify-center rounded text-[10px] leading-none text-muted hover:bg-border disabled:opacity-25"
+          >
+            ▲
+          </button>
+          <button
+            type="button"
+            disabled={!canMoveDown}
+            onClick={onMoveDown}
+            aria-label="টপিক নিচে নিন"
+            className="flex h-4 w-5 items-center justify-center rounded text-[10px] leading-none text-muted hover:bg-border disabled:opacity-25"
+          >
+            ▼
+          </button>
+        </div>
         <input
           className={`${ui.input} flex-1`}
           value={topic.name}

@@ -191,9 +191,7 @@ export function planToJson(plan: PlanData) {
       priority: s.priority,
       ...(s.weekdays?.length ? { weekdays: s.weekdays } : {}),
       ...(s.mandatory ? { mandatory: true } : {}),
-      topics: s.topics.map((t) =>
-        t.difficulty === "medium" ? t.name : { name: t.name, difficulty: t.difficulty, estimated_minutes: t.estimatedMinutes }
-      ),
+      topics: s.topics.map((t) => ({ name: t.name, difficulty: t.difficulty, estimated_minutes: t.estimatedMinutes })),
     })),
     daily_targets: plan.dailyTargets ?? [],
     revision_phase: { enabled: true, duration_days: plan.revisionDays },
