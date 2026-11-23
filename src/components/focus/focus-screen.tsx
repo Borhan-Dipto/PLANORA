@@ -119,6 +119,40 @@ export function FocusScreen({ session, superAdmin = false }: { session: ActiveSe
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [done]);
 
+  // Keep the screen awake for the whole session — otherwise the OS dims/locks the phone mid-timer
+  // and the student has to keep tapping the screen just to see the countdown. The lock is released
+  // by the OS whenever the tab goes into the background (that's normal — nothing to do about a
+  // backgrounded tab anyway), so it's re-requested on every visibilitychange back to visible, for
+  // as long as the session isn't done yet.
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
+  useEffect(() => {
+    if (done) return;
+    let cancelled = false;
+    const acquire = async () => {
+      try {
+        const lock = await navigator.wakeLock?.request("screen");
+        if (cancelled) {
+          lock?.release().catch(() => {});
+          return;
+        }
+        wakeLockRef.current = lock ?? null;
+      } catch {
+        /* unsupported, or denied (e.g. battery saver) — the timer still runs fine, just the screen may sleep */
+      }
+    };
+    acquire();
+    const onVisible = () => {
+      if (!document.hidden) acquire();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
+      wakeLockRef.current?.release().catch(() => {});
+      wakeLockRef.current = null;
+    };
+  }, [done]);
+
   useEffect(() => {
     document.documentElement.requestFullscreen?.().catch(() => {});
     // The PWA manifest no longer locks orientation, but some browsers still carry a stale lock
