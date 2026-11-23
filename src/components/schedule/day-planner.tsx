@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { planMyDay, unlockDay } from "@/lib/actions/schedule";
+import { planMyDay, unlockDay, addAdHocTopic } from "@/lib/actions/schedule";
 import { ui, fmtMinutes, DIFFICULTY_LABEL } from "@/components/ui";
 import type { Difficulty } from "@/lib/plan/schema";
 
@@ -46,9 +46,14 @@ export function DayPlanner({
   locked: boolean;
   dailyStudyMinutes: number;
 }) {
+  // Topics created on the fly this session via "+ নতুন টপিক/সাবজেক্ট" (addAdHocTopic already wrote
+  // them into the real plan server-side) — kept here too so they're pickable immediately, without
+  // waiting for the next router.refresh() to bring the fresh `subjects` prop back down.
+  const [extraTopics, setExtraTopics] = useState<FlatTopic[]>([]);
+
   const flat: FlatTopic[] = useMemo(
-    () =>
-      subjects.flatMap((s) =>
+    () => [
+      ...subjects.flatMap((s) =>
         s.topics.map((t) => ({
           subjectId: s.id,
           subjectName: s.name,
@@ -58,7 +63,9 @@ export function DayPlanner({
           remaining: t.remaining,
         }))
       ),
-    [subjects]
+      ...extraTopics,
+    ],
+    [subjects, extraTopics]
   );
   const byTopicId = useMemo(() => new Map(flat.map((f) => [f.topicId, f])), [flat]);
 
@@ -126,6 +133,49 @@ export function DayPlanner({
         setMsg({ type: "ok", text: "✓ অটোমেটিক টাইম ডিস্ট্রিবিউশনে ফিরে গেছে।" });
         router.refresh();
       } else setMsg({ type: "error", text: r.error });
+    });
+  };
+
+  // "টপিক তালিকায় নেই" — add something brand-new to the plan (under an existing subject, or a
+  // whole new subject) and immediately pick it for today, without leaving this page.
+  const [showNewTopic, setShowNewTopic] = useState(false);
+  const [newSubjectMode, setNewSubjectMode] = useState<"existing" | "new">(subjects.length ? "existing" : "new");
+  const [newSubjectId, setNewSubjectId] = useState(subjects[0]?.id ?? "");
+  const [newSubjectName, setNewSubjectName] = useState("");
+  const [newTopicName, setNewTopicName] = useState("");
+  const [newMinutes, setNewMinutes] = useState(60);
+  const [creating, startCreating] = useTransition();
+  const [createError, setCreateError] = useState("");
+
+  const createTopic = () => {
+    setCreateError("");
+    startCreating(async () => {
+      const r = await addAdHocTopic(planId, {
+        subjectId: newSubjectMode === "existing" ? newSubjectId : undefined,
+        newSubjectName: newSubjectMode === "new" ? newSubjectName : undefined,
+        topicName: newTopicName,
+        minutes: newMinutes,
+      });
+      if (!r.ok) {
+        setCreateError(r.error);
+        return;
+      }
+      setExtraTopics((e) => [
+        ...e,
+        {
+          subjectId: r.subjectId,
+          subjectName: r.subjectName,
+          topicId: r.topicId,
+          topicName: r.topicName,
+          difficulty: "medium",
+          remaining: r.minutes,
+        },
+      ]);
+      setPicks((p) => [...p, { topicId: r.topicId, minutes: r.minutes }]);
+      setNewTopicName("");
+      setShowNewTopic(false);
+      setMsg({ type: "ok", text: `✓ "${r.topicName}" প্ল্যানে ও আজকের তালিকায় যোগ হয়েছে।` });
+      router.refresh();
     });
   };
 
@@ -214,6 +264,90 @@ export function DayPlanner({
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {!showNewTopic ? (
+        <button type="button" onClick={() => setShowNewTopic(true)} className="mt-2 text-sm text-accent">
+          + একদম নতুন টপিক বা সাবজেক্ট যোগ করুন
+        </button>
+      ) : (
+        <div className="mt-3 space-y-2 rounded-lg border border-border p-3">
+          <p className="text-xs text-muted">প্ল্যানে নেই এমন কিছু আজ পড়তে/রিভিশন দিতে চাইলে এখানে যোগ করুন — এটা প্ল্যানেই যুক্ত হয়ে যাবে।</p>
+
+          {subjects.length > 0 && (
+            <div className="flex flex-wrap gap-2 text-sm">
+              <button
+                type="button"
+                onClick={() => setNewSubjectMode("existing")}
+                className={`rounded-lg border px-3 py-1.5 ${newSubjectMode === "existing" ? "border-accent bg-accent/10 text-accent" : "border-border text-muted"}`}
+              >
+                বিদ্যমান সাবজেক্টে
+              </button>
+              <button
+                type="button"
+                onClick={() => setNewSubjectMode("new")}
+                className={`rounded-lg border px-3 py-1.5 ${newSubjectMode === "new" ? "border-accent bg-accent/10 text-accent" : "border-border text-muted"}`}
+              >
+                নতুন সাবজেক্টে
+              </button>
+            </div>
+          )}
+
+          {newSubjectMode === "existing" && subjects.length > 0 ? (
+            <select className={ui.input} value={newSubjectId} onChange={(e) => setNewSubjectId(e.target.value)}>
+              {subjects.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              className={ui.input}
+              value={newSubjectName}
+              maxLength={120}
+              placeholder="নতুন সাবজেক্টের নাম"
+              onChange={(e) => setNewSubjectName(e.target.value)}
+            />
+          )}
+
+          <input
+            className={ui.input}
+            value={newTopicName}
+            maxLength={200}
+            placeholder="টপিকের নাম"
+            onChange={(e) => setNewTopicName(e.target.value)}
+          />
+
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={10}
+              max={1200}
+              step={10}
+              value={newMinutes}
+              onChange={(e) => setNewMinutes(Math.max(10, Math.min(1200, Number(e.target.value) || 10)))}
+              className={`${ui.input} w-24`}
+            />
+            <span className="text-xs text-muted">মিনিট</span>
+          </div>
+
+          {createError && <p className="text-sm text-error">{createError}</p>}
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={creating || !newTopicName.trim()}
+              onClick={createTopic}
+              className={`${ui.btn} ${ui.primary} disabled:opacity-50`}
+            >
+              {creating ? "যোগ হচ্ছে…" : "যোগ করুন"}
+            </button>
+            <button type="button" onClick={() => setShowNewTopic(false)} disabled={creating} className={ui.btn}>
+              বাতিল
+            </button>
+          </div>
         </div>
       )}
 

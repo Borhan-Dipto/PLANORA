@@ -7,7 +7,7 @@ import { plans, planTasks } from "@/db/schema";
 import { requireUserId, isSuperAdmin } from "@/lib/session";
 import { regenerateSchedule, todayFor } from "@/lib/schedule/service";
 import { cycleEnd, round5 } from "@/lib/schedule/engine";
-import { addDays } from "@/lib/plan/schema";
+import { addDays, newId, planDataSchema, type PlanData } from "@/lib/plan/schema";
 
 export async function setTaskDone(taskId: string, done: boolean) {
   const userId = await requireUserId();
@@ -166,6 +166,61 @@ export async function planMyDay(
   revalidatePath(`/planner/${planId}/schedule`);
   revalidatePath("/planner/day");
   return { ok: true as const };
+}
+
+/**
+ * Adds a brand-new topic to the plan on the fly — for the day-planner's "টপিক তালিকায় নেই" case,
+ * most notably picking up something new to study/revise on a ব্রেক day that was never part of the
+ * original syllabus. Either drops the topic into an existing subject (subjectId) or spins up a
+ * whole new subject first (newSubjectName) — never both. Writes straight to the plan (so it shows
+ * up in the normal editor too, not just today) and re-runs regenerateSchedule immediately so its
+ * minutes are properly accounted for even if the caller never goes on to planMyDay() it for today.
+ * Returns the new {subjectId, topicId} so the caller can fold it into that day's picks right away.
+ */
+export async function addAdHocTopic(
+  planId: string,
+  input: { subjectId?: string; newSubjectName?: string; topicName: string; minutes: number }
+) {
+  const userId = await requireUserId();
+  const [plan] = await withDbRetry(() =>
+    db
+      .select()
+      .from(plans)
+      .where(and(eq(plans.id, planId), eq(plans.userId, userId), eq(plans.status, "active"))),
+  );
+  if (!plan) return { ok: false as const, error: "চলমান প্ল্যান পাওয়া যায়নি" };
+
+  const topicName = input.topicName.trim();
+  if (!topicName) return { ok: false as const, error: "টপিকের নাম দিন" };
+  const minutes = Math.round(Number(input.minutes));
+  if (!Number.isFinite(minutes)) return { ok: false as const, error: "সময় ঠিক নয়" };
+
+  const data: PlanData = structuredClone(plan.planData);
+  let subject = input.subjectId ? data.subjects.find((s) => s.id === input.subjectId) : undefined;
+
+  if (!subject) {
+    const newSubjectName = input.newSubjectName?.trim();
+    if (!newSubjectName) return { ok: false as const, error: "বিষয়ের নাম দিন" };
+    subject = { id: newId(), name: newSubjectName, course: "", priority: 3, weekdays: [], mandatory: false, topics: [] };
+    data.subjects.push(subject);
+  }
+
+  const topic = { id: newId(), name: topicName, difficulty: "medium" as const, estimatedMinutes: minutes };
+  subject.topics.push(topic);
+
+  const parsed = planDataSchema.safeParse(data);
+  if (!parsed.success) return { ok: false as const, error: parsed.error.issues[0]?.message ?? "তথ্য সঠিক নয়" };
+
+  await withDbRetry(() =>
+    db.update(plans).set({ planData: parsed.data, updatedAt: new Date() }).where(eq(plans.id, planId)),
+  );
+  await regenerateSchedule(planId, userId, parsed.data, await todayFor(userId));
+
+  revalidatePath("/dashboard");
+  revalidatePath(`/planner/${planId}`);
+  revalidatePath(`/planner/${planId}/schedule`);
+  revalidatePath("/planner/day");
+  return { ok: true as const, subjectId: subject.id, subjectName: subject.name, topicId: topic.id, topicName: topic.name, minutes };
 }
 
 /** Un-fix a manually planned day — removes its locked tasks and lets the automatic engine take it back over. */
