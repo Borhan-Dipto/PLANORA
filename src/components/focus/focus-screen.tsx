@@ -4,8 +4,6 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { adjustFocusTarget, completeFocusSession, emergencyExitFocusSession, pingFocusSession, type ActiveSession } from "@/lib/actions/focus";
 
-const RING_R = 120;
-const RING_C = 2 * Math.PI * RING_R;
 const EXIT_REASONS = ["জরুরি প্রয়োজন", "ব্যাটারি/নেটওয়ার্ক সমস্যা", "শরীর খারাপ লাগছে", "অন্য কারণ"];
 
 // Milestones are checked against progress (0→1). Each fires once, in order, with a short
@@ -35,14 +33,16 @@ function vibrate(pattern: number | number[]) {
   }
 }
 
-function fmtClock(totalSeconds: number) {
+// Splits the remaining/overtime seconds into flip-card digit groups — ["04","32"] for mm:ss,
+// or ["01","04","32"] once the session passes an hour. Each string is always 2 digits so every
+// card group renders a steady pair, never a lone digit popping in when minutes cross from 9→10.
+function clockGroups(totalSeconds: number): string[] {
   const s = Math.max(0, Math.round(totalSeconds));
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
   const sec = s % 60;
-  return h > 0
-    ? `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`
-    : `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return h > 0 ? [pad(h), pad(m), pad(sec)] : [pad(m), pad(sec)];
 }
 
 /** Auto-complete-at-target + the +/- 5-minute adjuster are super_admin-only for now (premium
@@ -252,25 +252,15 @@ export function FocusScreen({ session, superAdmin = false }: { session: ActiveSe
   const overTime = progress >= 1;
   const remainingSec = Math.max(0, targetSec - elapsedSec);
   const overSec = Math.max(0, elapsedSec - targetSec);
-  const tone = overTime ? "error" : progress >= 0.75 ? "warning" : "success";
-  const strokeClass = { success: "stroke-accent", warning: "stroke-warning", error: "stroke-error" }[tone];
-  const textClass = { success: "text-white", warning: "text-warning", error: "text-error" }[tone];
-  const glowClass = { success: "bg-accent/25", warning: "bg-warning/25", error: "bg-error/30" }[tone];
-  const clippedProgress = Math.min(1, progress);
-  const dashOffset = RING_C * (1 - clippedProgress);
-  // Dot marks the live tip of the ring. The whole <svg> is rotated -90°, so a point placed at
-  // angle 2π·progress (clockwise from 3 o'clock, SVG's default) lands exactly on the filled edge
-  // after rotation — i.e. starting at 12 o'clock, same as the stroke itself.
-  const dotAngle = 2 * Math.PI * clippedProgress;
-  const dotX = 130 + RING_R * Math.cos(dotAngle);
-  const dotY = 130 + RING_R * Math.sin(dotAngle);
+  const groups = clockGroups(overTime ? overSec : remainingSec);
 
   return (
     <FocusShell>
       <div className="flex w-full max-w-sm flex-col items-center gap-1 text-center landscape:grid landscape:max-w-5xl landscape:grid-cols-[1fr_auto_1fr] landscape:items-center landscape:gap-10 landscape:text-left">
         <div className="landscape:col-start-1 landscape:row-start-1 landscape:justify-self-end">
-          {session.subjectName && <p className="text-sm font-medium text-slate-400">{session.subjectName}</p>}
-          <h1 className="mb-6 line-clamp-2 px-4 text-lg font-semibold text-white landscape:px-0 landscape:mb-4">{session.title}</h1>
+          {/* Kept small and muted on purpose — the digits are the thing to look at, not this. */}
+          {session.subjectName && <p className="text-xs font-medium text-slate-500">{session.subjectName}</p>}
+          <h1 className="mb-4 line-clamp-1 px-4 text-sm font-semibold text-slate-300 landscape:px-0">{session.title}</h1>
 
           <p className="min-h-[1.25rem] text-sm text-slate-400 transition-opacity duration-500 landscape:text-left">{AFFIRMATIONS[affirmIdx]}</p>
 
@@ -296,46 +286,44 @@ export function FocusScreen({ session, superAdmin = false }: { session: ActiveSe
           </div>
         </div>
 
-        {/* Ring + time — the main highlight, enlarged whenever the phone is in landscape. */}
-        <div className="relative flex h-64 w-64 shrink-0 items-center justify-center landscape:col-start-2 landscape:row-start-1 landscape:h-72 landscape:w-72">
-          {/* Ambient "breathing" glow behind the ring — a quiet sign the screen is alive, not static. */}
-          <div className={`absolute h-48 w-48 rounded-full ${glowClass} blur-3xl transition-colors duration-1000 landscape:h-56 landscape:w-56`} style={{ animation: "focus-breathe 4s ease-in-out infinite" }} />
+        {/* Flip-clock style digit cards — plain white/black only, no color-coded urgency, so the
+            countdown itself never becomes a second source of anxiety alongside the exam prep. */}
+        <div className="relative flex flex-col items-center landscape:col-start-2 landscape:row-start-1">
+          {/* Ambient "breathing" glow behind the cards — a quiet sign the screen is alive, not static. */}
+          <div className="absolute h-40 w-64 rounded-full bg-white/10 blur-3xl landscape:h-48 landscape:w-80" style={{ animation: "focus-breathe 4s ease-in-out infinite" }} />
 
-          <svg viewBox="0 0 260 260" className="relative h-64 w-64 -rotate-90 landscape:h-72 landscape:w-72">
-            <circle cx="130" cy="130" r={RING_R} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="10" />
-            <circle
-              cx="130"
-              cy="130"
-              r={RING_R}
-              fill="none"
-              strokeWidth="10"
-              strokeLinecap="round"
-              className={`${strokeClass} transition-[stroke-dashoffset] duration-1000 ease-linear ${overTime ? "animate-pulse" : ""}`}
-              strokeDasharray={RING_C}
-              strokeDashoffset={dashOffset}
-            />
-            {!overTime && (
-              <circle cx={dotX} cy={dotY} r="7" className={strokeClass} style={{ fill: "currentColor" }}>
-                <animate attributeName="r" values="6;8;6" dur="1.6s" repeatCount="indefinite" />
-              </circle>
-            )}
-          </svg>
-
-          <div className="absolute flex flex-col items-center">
-            <span className={`font-mono text-5xl font-bold tabular-nums transition-colors duration-500 ${textClass} landscape:text-6xl`}>
-              {overTime ? `+${fmtClock(overSec)}` : fmtClock(remainingSec)}
-            </span>
-            <span className="mt-1 text-xs text-slate-500 landscape:text-sm">
-              {overTime
-                ? autoCompleteEnabled
-                  ? "সম্পন্ন হচ্ছে…"
-                  : "অতিরিক্ত সময় — লক্ষ্য পার হয়েছে"
-                : `বাকি আছে · লক্ষ্য ${targetMinutes} মিনিট`}
-            </span>
+          <div className="relative flex items-center justify-center gap-1.5 landscape:gap-2.5">
+            {overTime && <span className="mr-1 self-start text-2xl font-bold text-white landscape:text-3xl">+</span>}
+            {groups.map((group, gi) => (
+              <div key={gi} className="flex items-center gap-1.5 landscape:gap-2.5">
+                {gi > 0 && (
+                  <span className="flex flex-col items-center gap-2 px-0.5">
+                    <span className="h-2 w-2 rounded-full bg-white/60" />
+                    <span className="h-2 w-2 rounded-full bg-white/60" />
+                  </span>
+                )}
+                {group.split("").map((d, di) => (
+                  <span
+                    key={di}
+                    className={`flex h-20 w-14 items-center justify-center rounded-2xl bg-white font-mono text-4xl font-bold tabular-nums text-black shadow-[0_8px_24px_rgba(0,0,0,0.4)] landscape:h-24 landscape:w-16 landscape:text-5xl ${overTime ? "animate-pulse" : ""}`}
+                  >
+                    {d}
+                  </span>
+                ))}
+              </div>
+            ))}
           </div>
 
+          <span className="relative mt-4 text-xs text-slate-500 landscape:text-sm">
+            {overTime
+              ? autoCompleteEnabled
+                ? "সম্পন্ন হচ্ছে…"
+                : "অতিরিক্ত সময় — লক্ষ্য পার হয়েছে"
+              : `বাকি আছে · লক্ষ্য ${targetMinutes} মিনিট`}
+          </span>
+
           {autoCompleteEnabled && !overTime && (
-            <div className="absolute -bottom-12 flex items-center gap-4 landscape:-bottom-16">
+            <div className="relative mt-5 flex items-center gap-4">
               <button
                 type="button"
                 onClick={() => adjustTime(-5)}
@@ -372,7 +360,7 @@ export function FocusScreen({ session, superAdmin = false }: { session: ActiveSe
       </div>
 
       <style>{`
-        @keyframes focus-breathe { 0%,100% { transform: scale(0.92); opacity: 0.55; } 50% { transform: scale(1.06); opacity: 0.9; } }
+        @keyframes focus-breathe { 0%,100% { transform: scale(0.92); opacity: 0.4; } 50% { transform: scale(1.06); opacity: 0.7; } }
         @keyframes focus-toast-in { from { opacity: 0; transform: translate(-50%, -80%); } to { opacity: 1; transform: translate(-50%, -100%); } }
       `}</style>
 
