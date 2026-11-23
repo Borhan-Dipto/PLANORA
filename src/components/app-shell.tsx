@@ -13,12 +13,18 @@ const NAV_ITEMS = [
   { href: "/subjects", key: "subjects" as const, icon: "📚" },
   { href: "/revision", key: "revision" as const, icon: "🔁" },
   { href: "/progress", key: "progress" as const, icon: "📈" },
+  // Starts a fresh ad-hoc session; /focus/custom itself redirects to /focus if one's already
+  // running, so this one link covers both "start a timer" and "resume my timer".
+  { href: "/focus/custom", key: "timer" as const, icon: "⏱️" },
   { href: "/billing", key: "billing" as const, icon: "💎" },
 ];
 
 const SETTINGS_ITEM = { href: "/settings", key: "settings" as const, icon: "⚙️" };
 
 function isActive(pathname: string, href: string) {
+  // The running timer itself lives at /focus (and /focus/[taskId]) — both still count as "on"
+  // the টাইমার nav item, not just its own /focus/custom start screen.
+  if (href === "/focus/custom") return pathname.startsWith("/focus");
   return href === "/dashboard" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
 }
 
