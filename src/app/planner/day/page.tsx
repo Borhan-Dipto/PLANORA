@@ -43,32 +43,16 @@ export default async function DayPlannerPage({ searchParams }: { searchParams: P
     );
   }
 
-  // A date the user has taken as a break (see takeBreak in actions/plans.ts) already shows
-  // "বিরতি" on the normal schedule — manually planning study on top of that would contradict the
-  // whole point of the feature, so this page offers nothing to pick for that date.
+  // A date the user has taken as a break (see takeBreak in actions/plans.ts) shows "বিরতি" on the
+  // normal schedule, but the break itself is still optional to use — the user may want to add a
+  // topic/subject to study, or do revision, during it. So this date still gets the full picker
+  // below; isBreakDay only adds a banner and widens which topics are selectable (every topic, not
+  // just ones with time left — including already-finished ones, for intentional revision).
   const [breakRow] = await db
     .select({ id: planTasks.id })
     .from(planTasks)
     .where(and(eq(planTasks.planId, active.id), eq(planTasks.date, date), eq(planTasks.kind, "break")));
-  if (breakRow) {
-    return (
-      <PageFrame title="দিনের সময় ঠিক করুন" back="/dashboard">
-        <div className="space-y-4">
-          <div className="flex gap-2">
-            <Link href="/planner/day" className={`${ui.btn} ${date === today ? ui.primary : ui.secondary}`}>
-              আজ
-            </Link>
-            <Link href="/planner/day?d=tomorrow" className={`${ui.btn} ${date === tomorrow ? ui.primary : ui.secondary}`}>
-              আগামীকাল
-            </Link>
-          </div>
-          <div className={`${ui.card} text-center text-muted`}>
-            <p>🌴 এই দিনটি ব্রেক হিসেবে রাখা হয়েছে — কোনো পড়া নির্ধারণের প্রয়োজন নেই।</p>
-          </div>
-        </div>
-      </PageFrame>
-    );
-  }
+  const isBreakDay = !!breakRow;
 
   // Minutes already "spoken for" per topic elsewhere (done, or locked on a different day) — this
   // date's own existing tasks don't count, since the user is about to re-pick them below.
@@ -95,7 +79,9 @@ export default async function DayPlannerPage({ searchParams }: { searchParams: P
   for (const t of tasks) if (t.topicId) initialMinutes[t.topicId] = (initialMinutes[t.topicId] ?? 0) + t.minutes;
   const locked = tasks.some((t) => t.locked);
 
-  // Only topics with real time left matter here — a topic already finished has nothing to pick today.
+  // Only topics with real time left matter here — a topic already finished has nothing to pick
+  // today. Exception: on a ব্রেক day, finished topics stay selectable too, so revision is possible
+  // (planMyDay logs picking an already-finished topic as "revision" automatically).
   const subjects: SubjectWithTopics[] = plan.subjects
     .map((s) => ({
       id: s.id,
@@ -107,7 +93,7 @@ export default async function DayPlannerPage({ searchParams }: { searchParams: P
           difficulty: t.difficulty,
           remaining: Math.max(0, t.estimatedMinutes - (spokenBy.get(t.id) ?? 0)),
         }))
-        .filter((t) => t.remaining >= 15 || (initialMinutes[t.id] ?? 0) > 0),
+        .filter((t) => isBreakDay || t.remaining >= 15 || (initialMinutes[t.id] ?? 0) > 0),
     }))
     .filter((s) => s.topics.length);
 
@@ -126,14 +112,24 @@ export default async function DayPlannerPage({ searchParams }: { searchParams: P
           </Link>
         </div>
 
-        <p className="text-xs text-muted">
-          ক্লাস রুটিন দেখে আজ/আগামীকাল ঠিক কোন টপিক পড়বেন তা খুঁজে যোগ করুন ও সময় বসান — কিছু না করলে অটোমেটিক সিস্টেম
-          নিজেই টপিক ও সময় ঠিক করে দেবে। (সব টপিক ও তাদের ডিফল্ট সময় একসাথে দেখে এডিট করতে চাইলে প্ল্যানের{" "}
-          <Link href={`/planner/${active.id}/edit`} className="text-accent">
-            এডিট পেজ
-          </Link>
-          ।)
-        </p>
+        {isBreakDay ? (
+          <div className={`${ui.card} text-sm`}>
+            <p>
+              🌴 এই দিনটি ব্রেক হিসেবে রাখা আছে — কিছু না করলে এটা ব্রেকই থাকবে। চাইলে ব্রেক বাতিল না করেই নিচে থেকে
+              কোনো টপিক বা সাবজেক্ট খুঁজে পড়তে পারেন, অথবা আগে পড়া কোনো টপিক রিভিশন দিতে পারেন — এতে ব্রেক কোনোভাবেই
+              বাতিল হবে না।
+            </p>
+          </div>
+        ) : (
+          <p className="text-xs text-muted">
+            ক্লাস রুটিন দেখে আজ/আগামীকাল ঠিক কোন টপিক পড়বেন তা খুঁজে যোগ করুন ও সময় বসান — কিছু না করলে অটোমেটিক সিস্টেম
+            নিজেই টপিক ও সময় ঠিক করে দেবে। (সব টপিক ও তাদের ডিফল্ট সময় একসাথে দেখে এডিট করতে চাইলে প্ল্যানের{" "}
+            <Link href={`/planner/${active.id}/edit`} className="text-accent">
+              এডিট পেজ
+            </Link>
+            ।)
+          </p>
+        )}
 
         <DayPlanner
           key={date}

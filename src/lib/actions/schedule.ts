@@ -1,12 +1,12 @@
 "use server";
 
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db, withDbRetry } from "@/db/client";
 import { plans, planTasks } from "@/db/schema";
 import { requireUserId, isSuperAdmin } from "@/lib/session";
 import { regenerateSchedule, todayFor } from "@/lib/schedule/service";
-import { learningEnd, cycleEnd, round5 } from "@/lib/schedule/engine";
+import { cycleEnd, round5 } from "@/lib/schedule/engine";
 import { addDays } from "@/lib/plan/schema";
 
 export async function setTaskDone(taskId: string, done: boolean) {
@@ -69,9 +69,11 @@ export async function completeToday(planId: string) {
 /**
  * Manually fix one day's (today or tomorrow's) study plan topic-by-topic — for when real class
  * durations are only known that morning or the night before, and the user needs to see and pick
- * exactly which topic each block of time goes to. Replaces that day's pending study/revision
- * tasks with the given topic+minutes choices and locks them so the automatic engine never
- * touches that day again.
+ * exactly which topic each block of time goes to. Also doubles as the "study/revise during a
+ * ব্রেক day" picker: a ব্রেক date isn't blocked here (see /planner/day), so the user can still add
+ * a topic or do revision on a day they've otherwise taken off, without cancelling the break.
+ * Replaces that day's pending study/revision tasks with the given topic+minutes choices and locks
+ * them so the automatic engine never touches that day again.
  */
 export async function planMyDay(
   planId: string,
@@ -92,11 +94,28 @@ export async function planMyDay(
   if (date !== today && date !== tomorrow) return { ok: false as const, error: "শুধু আজ বা আগামীকালের জন্য সময় ঠিক করা যায়" };
 
   const data = plan.planData;
-  const kind: "study" | "revision" = date <= learningEnd(data) ? "study" : "revision";
   if (date < data.startDate || date > cycleEnd(data)) return { ok: false as const, error: "এই তারিখ প্ল্যানের বাইরে" };
 
   const cleanAllocs = allocations.filter((a) => Number.isFinite(a.minutes) && a.minutes > 0);
   if (!cleanAllocs.length) return { ok: false as const, error: "অন্তত একটা টপিকের জন্য সময় দিন" };
+
+  // Whether a picked topic still has real time left (study) or was already finished elsewhere
+  // (revision) — a topic with nothing left over is logged as revision regardless of the date,
+  // which is what makes picking an already-done topic on a ব্রেক day work correctly.
+  const spoken = await withDbRetry(() =>
+    db
+      .select({ topicId: planTasks.topicId, minutes: sql<number>`sum(${planTasks.minutes})::int` })
+      .from(planTasks)
+      .where(
+        and(
+          eq(planTasks.planId, planId),
+          inArray(planTasks.kind, ["study", "revision"]),
+          sql`(${planTasks.status} = 'done' or (${planTasks.locked} = true and ${planTasks.date} <> ${date}))`
+        )
+      )
+      .groupBy(planTasks.topicId),
+  );
+  const spokenBy = new Map(spoken.map((s) => [s.topicId, s.minutes]));
 
   const newTasks: (typeof planTasks.$inferInsert)[] = [];
   let sort = 0;
@@ -104,11 +123,12 @@ export async function planMyDay(
     const subject = data.subjects.find((s) => s.id === alloc.subjectId);
     const topic = subject?.topics.find((t) => t.id === alloc.topicId);
     if (!subject || !topic) continue;
+    const remaining = topic.estimatedMinutes - (spokenBy.get(topic.id) ?? 0);
     newTasks.push({
       planId,
       userId,
       date,
-      kind,
+      kind: remaining > 0 ? "study" : "revision",
       subjectId: subject.id,
       topicId: topic.id,
       subjectName: subject.name,
